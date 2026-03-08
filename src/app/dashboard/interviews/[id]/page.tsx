@@ -10,6 +10,7 @@ import { EvaluationSummary } from "@/components/interview/evaluation-summary";
 import { ManualEvaluation } from "@/components/interview/manual-evaluation";
 import { PrintReport, type PrintReportProps } from "@/components/interview/print-report";
 import { downloadInterviewPDF } from "@/lib/pdf/generate-pdf";
+import { LoadingScreen } from "@/components/ui/loading-screen";
 import type { Evaluation, Question, Transcript } from "@/types";
 
 const tabItems = [
@@ -26,6 +27,7 @@ interface ReportData {
     id: string;
     started_at: string | null;
     completed_at: string | null;
+    deadline_at: string | null;
     status: string;
   };
   candidate: {
@@ -114,6 +116,9 @@ export default function InterviewDetailPage() {
   const candidateName = reportData?.candidate?.name ?? "不明";
   const candidateInitial = candidateName.charAt(0);
   const position = reportData?.candidate?.desired_position ?? "";
+  const deadlineDate = reportData?.interview?.deadline_at
+    ? new Date(reportData.interview.deadline_at).toLocaleString("ja-JP")
+    : "-";
   const interviewDate = reportData?.interview?.started_at
     ? new Date(reportData.interview.started_at).toLocaleString("ja-JP")
     : "-";
@@ -175,7 +180,7 @@ export default function InterviewDetailPage() {
           </div>
           <div>
             <h1 className="text-lg font-bold">{candidateName}</h1>
-            <p className="text-sm text-text-sub">{position} - {interviewDate}</p>
+            <p className="text-sm text-text-sub">{position} - 回答期限: {deadlineDate}</p>
           </div>
         </div>
         <div className="flex items-center gap-4">
@@ -223,11 +228,7 @@ export default function InterviewDetailPage() {
       <div className="grid grid-cols-3 gap-6 print:hidden">
         {/* Main content */}
         <div className="col-span-2">
-          {loading && (
-            <div className="rounded-lg border border-border bg-surface p-5">
-              <p className="text-sm text-text-muted">面接データがありません</p>
-            </div>
-          )}
+          {loading && <LoadingScreen />}
 
           {!loading && activeTab === "transcript" && (
             <div className="space-y-4">

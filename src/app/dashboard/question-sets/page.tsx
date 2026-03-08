@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { Plus, MessageSquare } from "lucide-react";
+import { LoadingScreen } from "@/components/ui/loading-screen";
 
 interface QSRow {
   id: string;
@@ -43,7 +44,7 @@ export default function QuestionSetsPage() {
 
       {/* Card Grid */}
       {loading ? (
-        <p className="text-sm text-text-muted">読み込み中...</p>
+        <LoadingScreen />
       ) : questionSets.length === 0 ? (
         <p className="text-sm text-text-muted">質問セットがまだ作成されていません。「新規作成」から始めてください。</p>
       ) : (

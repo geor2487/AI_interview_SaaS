@@ -2,167 +2,280 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import {
   Video,
-  Calendar,
   Clock,
   ChevronRight,
   MessageSquare,
   Pencil,
+  Building2,
+  AlertCircle,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/components/providers/auth-provider";
 import { createClient } from "@/lib/supabase/client";
-
-interface MessageRow {
-  id: string;
-  content: string;
-  sender_type: string;
-  created_at: string;
-}
+import {
+  formatDeadline,
+  formatDeadlineDate,
+  isDeadlineExpired,
+  canStartInterview,
+} from "@/lib/interview/deadline";
+import { LoadingScreen } from "@/components/ui/loading-screen";
+import type { InterviewStatus } from "@/types";
 
 interface InterviewRow {
   id: string;
-  scheduled_at: string | null;
-  invite_token: string;
+  status: InterviewStatus;
+  deadline_at: string | null;
+  created_at: string;
+  organization_id: string;
+  org_name?: string;
 }
+
+const statusConfig: Record<
+  InterviewStatus,
+  { label: string; color: string }
+> = {
+  pending: {
+    label: "未受験",
+    color: "bg-yellow-bg text-yellow border-yellow/20",
+  },
+  in_progress: {
+    label: "進行中",
+    color: "bg-accent-light text-accent-text border-accent/20",
+  },
+  completed: {
+    label: "完了",
+    color: "bg-green-bg text-green border-green/20",
+  },
+  evaluated: {
+    label: "評価済",
+    color: "bg-green-bg text-green border-green/20",
+  },
+};
 
 export default function PortalPage() {
   const { user } = useAuth();
+  const router = useRouter();
   const fullName = user?.user_metadata?.full_name ?? "ユーザー";
 
-  const [nextInterview, setNextInterview] = useState<InterviewRow | null>(null);
-  const [messages, setMessages] = useState<MessageRow[]>([]);
+  const [interviews, setInterviews] = useState<InterviewRow[]>([]);
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    if (!user) return;
+    if (!user) {
+      setLoading(false);
+      return;
+    }
     const supabase = createClient();
 
-    // Fetch next upcoming interview for this candidate
-    supabase
-      .from("interviews")
-      .select("id, scheduled_at, invite_token, candidate:candidates!inner(user_id)")
-      .eq("candidates.user_id", user.id)
-      .in("status", ["pending", "in_progress"])
-      .order("scheduled_at", { ascending: true })
-      .limit(1)
-      .then(({ data }) => {
-        if (data && data.length > 0) setNextInterview(data[0] as unknown as InterviewRow);
-      });
+    (async () => {
+      // 1. Get candidate record
+      const { data: candidate } = await supabase
+        .from("candidates")
+        .select("id")
+        .eq("user_id", user.id)
+        .single();
 
-    // Fetch recent messages
-    supabase
-      .from("messages")
-      .select("id, content, sender_type, created_at")
-      .order("created_at", { ascending: false })
-      .limit(5)
-      .then(({ data }) => setMessages(data ?? []));
+      if (!candidate) {
+        setLoading(false);
+        return;
+      }
+
+      // 2. Get interviews
+      const { data: interviewRows } = await supabase
+        .from("interviews")
+        .select("id, status, deadline_at, created_at, organization_id")
+        .eq("candidate_id", candidate.id)
+        .order("created_at", { ascending: false });
+
+      if (!interviewRows || interviewRows.length === 0) {
+        setLoading(false);
+        return;
+      }
+
+      // 3. Get organization names
+      const orgIds = [...new Set(interviewRows.map((i) => i.organization_id))];
+      const { data: orgs } = await supabase
+        .from("organizations")
+        .select("id, name")
+        .in("id", orgIds);
+
+      const orgMap = new Map(
+        (orgs ?? []).map((o) => [o.id, o.name as string])
+      );
+
+      const mapped: InterviewRow[] = interviewRows.map((row) => ({
+        ...row,
+        org_name: orgMap.get(row.organization_id) ?? "不明な企業",
+      }));
+
+      setInterviews(mapped);
+      setLoading(false);
+    })();
   }, [user]);
 
   return (
     <div className="space-y-8">
       {/* Welcome */}
       <div>
-        <h1 className="text-xl font-bold text-foreground">こんにちは、{fullName}さん</h1>
-        <p className="mt-1 text-sm text-text-muted">選考の進捗と今後の予定を確認できます</p>
+        <h1 className="text-xl font-bold text-foreground">
+          こんにちは、{fullName}さん
+        </h1>
+        <p className="mt-1 text-sm text-text-muted">
+          選考の進捗と今後の予定を確認できます
+        </p>
       </div>
 
-      {/* Two Column */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-        {/* Next Interview */}
-        <div className="bg-surface rounded-xl border border-border p-6">
-          <h2 className="text-sm font-semibold text-foreground mb-4">次回面接</h2>
-          {nextInterview ? (
-            <>
-              <div className="space-y-3">
-                {nextInterview.scheduled_at && (
-                  <>
-                    <div className="flex items-center gap-3">
-                      <Calendar className="h-4 w-4 text-accent" />
-                      <span className="text-sm text-foreground">
-                        {new Date(nextInterview.scheduled_at).toLocaleDateString("ja-JP", { year: "numeric", month: "long", day: "numeric", weekday: "short" })}
-                      </span>
-                    </div>
-                    <div className="flex items-center gap-3">
-                      <Clock className="h-4 w-4 text-accent" />
-                      <span className="text-sm text-foreground">
-                        {new Date(nextInterview.scheduled_at).toLocaleTimeString("ja-JP", { hour: "2-digit", minute: "2-digit" })}
-                      </span>
-                    </div>
-                  </>
-                )}
-              </div>
-              <Link
-                href={`/interview/${nextInterview.invite_token}`}
-                className={cn(
-                  "mt-5 w-full h-10 rounded-lg text-sm font-semibold text-white flex items-center justify-center gap-2 transition-all",
-                  "bg-gradient-to-r from-violet-600 to-indigo-600 hover:from-violet-500 hover:to-indigo-500",
-                  "shadow-md shadow-violet-500/20 hover:shadow-violet-500/30"
-                )}
-              >
-                <Video className="h-4 w-4" />
-                面接に参加
-              </Link>
-            </>
-          ) : (
-            <p className="text-sm text-text-muted">予定されている面接はありません。</p>
-          )}
-        </div>
+      {/* Interview List */}
+      <div>
+        <h2 className="text-base font-semibold text-foreground mb-4">
+          面接一覧
+        </h2>
 
-        {/* Profile Completion */}
-        <div className="bg-surface rounded-xl border border-border p-6">
-          <h2 className="text-sm font-semibold text-foreground mb-4">プロフィール</h2>
-          <div className="space-y-2">
-            <p className="text-sm text-text-sub">プロフィールの情報を充実させると、選考に有利になります。</p>
-            <Link
-              href="/portal/profile"
-              className="inline-flex items-center gap-1.5 text-sm font-medium text-accent hover:text-accent-text transition-colors"
-            >
-              <Pencil className="h-3.5 w-3.5" />
-              プロフィールを編集
-            </Link>
+        {loading ? (
+          <LoadingScreen />
+        ) : interviews.length === 0 ? (
+          <div className="rounded-lg border border-border bg-surface p-8 text-center">
+            <p className="text-sm text-text-muted">
+              現在予定されている面接はありません
+            </p>
           </div>
-        </div>
+        ) : (
+          <div className="space-y-3">
+            {interviews.map((interview) => {
+              const status = statusConfig[interview.status];
+              const expired = isDeadlineExpired(interview.deadline_at);
+              const startCheck = canStartInterview(
+                interview.status,
+                interview.deadline_at
+              );
+
+              return (
+                <div
+                  key={interview.id}
+                  className="rounded-lg border border-border bg-surface p-5"
+                >
+                  <div className="flex items-start justify-between gap-4">
+                    <div className="flex-1 min-w-0 space-y-2">
+                      {/* Company Name */}
+                      <div className="flex items-center gap-2">
+                        <Building2 className="h-4 w-4 text-text-sub shrink-0" />
+                        <span className="text-sm font-semibold text-foreground truncate">
+                          {interview.org_name}
+                        </span>
+                      </div>
+
+                      {/* Status Badge */}
+                      <div className="flex items-center gap-3">
+                        <span
+                          className={cn(
+                            "inline-flex items-center rounded-full border px-2.5 py-0.5 text-xs font-medium",
+                            status.color
+                          )}
+                        >
+                          {status.label}
+                        </span>
+                      </div>
+
+                      {/* Deadline */}
+                      {interview.deadline_at && (
+                        <div className="flex items-center gap-2">
+                          <Clock
+                            className={cn(
+                              "h-3.5 w-3.5 shrink-0",
+                              expired ? "text-red" : "text-text-sub"
+                            )}
+                          />
+                          <span
+                            className={cn(
+                              "text-xs",
+                              expired
+                                ? "text-red font-medium"
+                                : "text-text-sub"
+                            )}
+                          >
+                            {expired
+                              ? "期限切れ"
+                              : `${formatDeadlineDate(interview.deadline_at)}（${formatDeadline(interview.deadline_at)}）`}
+                          </span>
+                        </div>
+                      )}
+                    </div>
+
+                    {/* Start Button */}
+                    <div className="shrink-0 relative group">
+                      <button
+                        onClick={() =>
+                          router.push(
+                            `/portal/interviews/${interview.id}/lobby`
+                          )
+                        }
+                        disabled={!startCheck.allowed}
+                        className={cn(
+                          "h-9 px-4 rounded-lg text-sm font-semibold text-white flex items-center gap-1.5 transition-all",
+                          startCheck.allowed
+                            ? "bg-gradient-to-r from-violet-600 to-indigo-600 hover:from-violet-500 hover:to-indigo-500 shadow-md shadow-violet-500/20 hover:shadow-violet-500/30"
+                            : "bg-gray-300 cursor-not-allowed text-gray-500"
+                        )}
+                      >
+                        <Video className="h-3.5 w-3.5" />
+                        面接を開始
+                      </button>
+                      {!startCheck.allowed && startCheck.reason && (
+                        <div className="absolute right-0 top-full mt-1 z-10 hidden group-hover:block">
+                          <div className="flex items-center gap-1.5 rounded-lg border border-border bg-surface px-3 py-2 shadow-lg whitespace-nowrap">
+                            <AlertCircle className="h-3.5 w-3.5 text-text-muted shrink-0" />
+                            <span className="text-xs text-text-sub">
+                              {startCheck.reason}
+                            </span>
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        )}
       </div>
 
-      {/* Recent Messages */}
-      <div className="bg-surface rounded-xl border border-border overflow-hidden">
-        <div className="flex items-center justify-between px-6 pt-5 pb-3">
-          <h2 className="text-sm font-semibold text-foreground">最近のメッセージ</h2>
+      {/* Quick Links */}
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <div className="bg-surface rounded-xl border border-border p-5">
+          <h2 className="text-sm font-semibold text-foreground mb-2">
+            プロフィール
+          </h2>
+          <p className="text-sm text-text-sub mb-3">
+            プロフィールの情報を充実させると、選考に有利になります。
+          </p>
+          <Link
+            href="/portal/profile"
+            className="inline-flex items-center gap-1.5 text-sm font-medium text-accent hover:text-accent-text transition-colors"
+          >
+            <Pencil className="h-3.5 w-3.5" />
+            プロフィールを編集
+          </Link>
+        </div>
+
+        <div className="bg-surface rounded-xl border border-border p-5">
+          <h2 className="text-sm font-semibold text-foreground mb-2">
+            メッセージ
+          </h2>
+          <p className="text-sm text-text-sub mb-3">
+            企業からのメッセージを確認できます。
+          </p>
           <Link
             href="/portal/messages"
-            className="text-xs font-medium text-accent hover:text-accent-text transition-colors flex items-center gap-0.5"
+            className="inline-flex items-center gap-1.5 text-sm font-medium text-accent hover:text-accent-text transition-colors"
           >
-            すべて表示
+            <MessageSquare className="h-3.5 w-3.5" />
+            メッセージを確認
             <ChevronRight className="h-3.5 w-3.5" />
           </Link>
         </div>
-        {messages.length === 0 ? (
-          <div className="px-6 pb-5">
-            <p className="text-sm text-text-muted">メッセージはまだありません。</p>
-          </div>
-        ) : (
-          <div className="divide-y divide-border-sub">
-            {messages.map((msg) => (
-              <Link
-                key={msg.id}
-                href="/portal/messages"
-                className="flex items-center gap-3.5 px-6 py-3.5 hover:bg-accent-light/30 transition-colors"
-              >
-                <div className="h-9 w-9 rounded-full bg-gradient-to-br from-accent to-purple-500 flex items-center justify-center text-[11px] font-bold text-white shrink-0">
-                  <MessageSquare className="h-4 w-4" />
-                </div>
-                <div className="flex-1 min-w-0">
-                  <p className="text-xs text-text-sub truncate">{msg.content}</p>
-                  <span className="text-[11px] text-text-muted">
-                    {new Date(msg.created_at).toLocaleDateString("ja-JP")}
-                  </span>
-                </div>
-                <ChevronRight className="h-4 w-4 text-text-muted shrink-0" />
-              </Link>
-            ))}
-          </div>
-        )}
       </div>
     </div>
   );

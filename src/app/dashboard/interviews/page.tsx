@@ -4,14 +4,14 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import { Eye, Plus } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { useOrganization } from "@/hooks/use-organization";
-import { createClient } from "@/lib/supabase/client";
+import { LoadingScreen } from "@/components/ui/loading-screen";
 import type { InterviewStatus } from "@/types";
 
 interface InterviewRow {
   id: string;
   status: InterviewStatus;
   scheduled_at: string | null;
+  deadline_at: string | null;
   created_at: string;
   candidate: { name: string } | null;
 }
@@ -32,27 +32,18 @@ const statusBadge: Record<InterviewStatus, { label: string; className: string }>
 };
 
 export default function InterviewsPage() {
-  const { orgId } = useOrganization();
   const [interviews, setInterviews] = useState<InterviewRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState<InterviewStatus | "all">("all");
 
   useEffect(() => {
-    if (!orgId) {
-      setLoading(false);
-      return;
-    }
-    const supabase = createClient();
-    supabase
-      .from("interviews")
-      .select("id, status, scheduled_at, created_at, candidate:candidates(name)")
-      .eq("organization_id", orgId)
-      .order("created_at", { ascending: false })
-      .then(({ data }) => {
-        setInterviews((data as InterviewRow[] | null) ?? []);
-        setLoading(false);
-      });
-  }, [orgId]);
+    fetch("/api/interviews")
+      .then((res) => res.json())
+      .then((data) => {
+        if (Array.isArray(data)) setInterviews(data);
+      })
+      .finally(() => setLoading(false));
+  }, []);
 
   const filtered = interviews.filter(
     (iv) => activeTab === "all" || iv.status === activeTab
@@ -93,7 +84,7 @@ export default function InterviewsPage() {
       {/* Table */}
       <div className="rounded-lg border border-border bg-surface">
         {loading ? (
-          <div className="px-5 py-8 text-center text-sm text-text-muted">面接データがありません</div>
+          <LoadingScreen />
         ) : filtered.length === 0 ? (
           <div className="px-5 py-8 text-center text-sm text-text-muted">
             {interviews.length === 0
@@ -106,7 +97,7 @@ export default function InterviewsPage() {
               <tr className="border-b border-border-sub text-left text-xs text-text-muted">
                 <th className="px-5 py-3 font-medium">候補者</th>
                 <th className="px-5 py-3 font-medium">ステータス</th>
-                <th className="px-5 py-3 font-medium">予定日時</th>
+                <th className="px-5 py-3 font-medium">回答期限</th>
                 <th className="px-5 py-3 font-medium">操作</th>
               </tr>
             </thead>
@@ -131,8 +122,8 @@ export default function InterviewsPage() {
                       </span>
                     </td>
                     <td className="px-5 py-3 text-text-muted">
-                      {iv.scheduled_at
-                        ? new Date(iv.scheduled_at).toLocaleString("ja-JP", { month: "numeric", day: "numeric", hour: "2-digit", minute: "2-digit" })
+                      {iv.deadline_at
+                        ? new Date(iv.deadline_at).toLocaleString("ja-JP", { month: "numeric", day: "numeric", hour: "2-digit", minute: "2-digit" })
                         : "-"}
                     </td>
                     <td className="px-5 py-3">

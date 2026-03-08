@@ -60,7 +60,7 @@ export async function POST(request: NextRequest) {
   // Fetch candidate's interview to get the invite_token
   const { data: interview, error: interviewError } = await supabase
     .from("interviews")
-    .select("id, invite_token")
+    .select("id, invite_token, deadline_at")
     .eq("candidate_id", candidate_id)
     .order("created_at", { ascending: false })
     .limit(1)
@@ -83,11 +83,23 @@ export async function POST(request: NextRequest) {
   const baseUrl = process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000";
   const inviteUrl = `${baseUrl}/interview/${interview.invite_token}`;
 
+  // Format deadline_at to Japanese date string
+  const deadlineDate = interview.deadline_at
+    ? new Date(interview.deadline_at).toLocaleDateString("ja-JP", {
+        year: "numeric",
+        month: "long",
+        day: "numeric",
+        hour: "2-digit",
+        minute: "2-digit",
+      })
+    : "期限なし";
+
   if (method === "email") {
     const { subject, body: emailBody } = invitationEmail({
       candidate_name: candidate.name,
       company_name: org?.name ?? "企業",
       interview_url: inviteUrl,
+      deadline_date: deadlineDate,
     });
 
     try {

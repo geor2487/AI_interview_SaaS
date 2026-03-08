@@ -3,7 +3,8 @@
 import { useEffect, useState } from "react";
 import { ArrowLeft, GripVertical, Pencil, Plus, Save, Trash2 } from "lucide-react";
 import Link from "next/link";
-import { useParams } from "next/navigation";
+import { useParams, useRouter } from "next/navigation";
+import { LoadingScreen } from "@/components/ui/loading-screen";
 import type { Question } from "@/types";
 
 interface QSData {
@@ -14,6 +15,7 @@ interface QSData {
 
 export default function QuestionSetDetailPage() {
   const params = useParams();
+  const router = useRouter();
   const qsId = params.id as string;
   const [qs, setQs] = useState<QSData | null>(null);
   const [questions, setQuestions] = useState<Question[]>([]);
@@ -50,6 +52,8 @@ export default function QuestionSetDetailPage() {
       if (!res.ok) {
         const data = await res.json();
         alert(data.error || "保存に失敗しました。");
+      } else {
+        router.push("/dashboard/question-sets");
       }
     } finally {
       setSaving(false);
@@ -57,7 +61,7 @@ export default function QuestionSetDetailPage() {
   };
 
   if (loading) {
-    return <p className="text-sm text-text-muted p-6">読み込み中...</p>;
+    return <LoadingScreen />;
   }
 
   if (!qs) {

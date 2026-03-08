@@ -66,6 +66,7 @@ export interface Interview {
   status: InterviewStatus;
   current_question_index: number;
   scheduled_at: string | null;
+  deadline_at: string | null;
   started_at: string | null;
   completed_at: string | null;
   invite_token: string;

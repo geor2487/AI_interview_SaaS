@@ -90,7 +90,7 @@ export default function NewQuestionSetPage() {
         alert(data.error || "保存に失敗しました。");
         return;
       }
-      router.push(`/dashboard/question-sets/${data.id}`);
+      router.push("/dashboard/question-sets");
     } catch (e) {
       console.error("handleSave error:", e);
       alert("保存中にエラーが発生しました。");

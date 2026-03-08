@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { Send, Paperclip, Search } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { LoadingScreen } from "@/components/ui/loading-screen";
 import { useAuth } from "@/components/providers/auth-provider";
 import { createClient } from "@/lib/supabase/client";
 import type { Message } from "@/types";
@@ -50,7 +51,7 @@ export default function MessagesPage() {
           {/* Messages */}
           <div className="flex-1 overflow-y-auto px-5 py-5 space-y-4">
             {loading ? (
-              <p className="text-sm text-text-muted text-center">メッセージがありません</p>
+              <LoadingScreen />
             ) : messages.length === 0 ? (
               <p className="text-sm text-text-muted text-center">メッセージはまだありません。</p>
             ) : (

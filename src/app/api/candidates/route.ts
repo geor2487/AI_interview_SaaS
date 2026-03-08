@@ -56,7 +56,18 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: "組織メンバー情報が見つかりません。" }, { status: 403 });
   }
 
-  const { name, email, desired_position } = await request.json();
+  const {
+    name,
+    email,
+    phone,
+    date_of_birth,
+    gender,
+    location,
+    desired_position,
+    desired_salary,
+    available_from,
+    self_introduction,
+  } = await request.json();
 
   if (!name || !email) {
     return NextResponse.json({ error: "氏名とメールアドレスは必須です。" }, { status: 400 });
@@ -68,7 +79,14 @@ export async function POST(request: NextRequest) {
       organization_id: member.organization_id,
       name,
       email,
+      phone: phone || null,
+      date_of_birth: date_of_birth || null,
+      gender: gender || null,
+      location: location || null,
       desired_position: desired_position || null,
+      desired_salary: desired_salary || null,
+      available_from: available_from || null,
+      self_introduction: self_introduction || null,
     })
     .select()
     .single();

@@ -7,6 +7,7 @@ import { useAuth } from "@/components/providers/auth-provider";
 import { useOrganization } from "@/hooks/use-organization";
 import { createClient } from "@/lib/supabase/client";
 import { ScoreChart } from "@/components/dashboard/score-chart";
+import { LoadingScreen } from "@/components/ui/loading-screen";
 
 const statusMap: Record<string, { label: string; className: string }> = {
   pending: { label: "予定", className: "bg-yellow-bg text-yellow" },
@@ -140,7 +141,7 @@ export default function DashboardPage() {
         <div className="rounded-lg border border-border bg-surface p-5">
           <h2 className="text-sm font-semibold text-text-sub mb-4">パイプライン</h2>
           {loading ? (
-            <p className="text-sm text-text-muted">データがありません</p>
+            <LoadingScreen />
           ) : (
             <div className="grid grid-cols-2 gap-4">
               {statItems.map((s) => {
@@ -186,7 +187,7 @@ export default function DashboardPage() {
           <h2 className="text-sm font-semibold">最近の面接</h2>
         </div>
         {loading ? (
-          <div className="px-5 py-8 text-center text-sm text-text-muted">面接データがありません</div>
+          <LoadingScreen />
         ) : recentInterviews.length === 0 ? (
           <div className="px-5 py-8 text-center text-sm text-text-muted">
             面接データがありません。「面接」メニューから新規作成してください。

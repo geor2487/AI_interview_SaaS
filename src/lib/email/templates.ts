@@ -5,6 +5,7 @@ interface TemplateVars {
   interview_date?: string;
   duration?: string;
   result_days?: string;
+  deadline_date?: string;
 }
 
 function replaceVars(template: string, vars: TemplateVars): string {
@@ -14,26 +15,36 @@ function replaceVars(template: string, vars: TemplateVars): string {
     .replace(/\{\{interview_url\}\}/g, vars.interview_url ?? "")
     .replace(/\{\{interview_date\}\}/g, vars.interview_date ?? "")
     .replace(/\{\{duration\}\}/g, vars.duration ?? "30")
-    .replace(/\{\{result_days\}\}/g, vars.result_days ?? "5");
+    .replace(/\{\{result_days\}\}/g, vars.result_days ?? "5")
+    .replace(/\{\{deadline_date\}\}/g, vars.deadline_date ?? "");
 }
 
 export function invitationEmail(vars: TemplateVars) {
-  const subject = replaceVars("【{{company_name}}】面接のご案内", vars);
+  const subject = replaceVars("【{{company_name}}】AI面接のご案内", vars);
   const body = replaceVars(
     `{{candidate_name}} 様
 
 この度は{{company_name}}にご応募いただき、誠にありがとうございます。
 
 書類選考の結果、ぜひ面接にお進みいただきたくご連絡いたしました。
-下記のリンクより、AI面接にご参加ください。
+下記のリンクよりアカウントを作成し、AI面接を受験してください。
 
 ■ 面接リンク
 {{interview_url}}
 
-■ 面接時間
+■ 回答期限
+{{deadline_date}}
+
+■ 所要時間
 約{{duration}}分
 
+■ 受験の流れ
+1. 上記リンクからアカウントを作成
+2. プロフィールを登録
+3. マイページから「面接を開始」をクリック
+
 ■ 注意事項
+・回答期限までに必ず受験を完了してください
 ・静かな環境でご参加ください
 ・カメラとマイクの使用を許可してください
 ・安定したインターネット接続をご確認ください
@@ -48,14 +59,14 @@ export function invitationEmail(vars: TemplateVars) {
 }
 
 export function reminderEmail(vars: TemplateVars) {
-  const subject = replaceVars("【リマインド】明日の面接について - {{company_name}}", vars);
+  const subject = replaceVars("【リマインド】面接の回答期限が近づいています - {{company_name}}", vars);
   const body = replaceVars(
     `{{candidate_name}} 様
 
-明日の面接についてリマインドいたします。
+AI面接の回答期限が近づいておりますので、お知らせいたします。
 
-■ 面接日時
-{{interview_date}}
+■ 回答期限
+{{deadline_date}}
 
 ■ 面接リンク
 {{interview_url}}
@@ -63,7 +74,7 @@ export function reminderEmail(vars: TemplateVars) {
 ■ 所要時間
 約{{duration}}分
 
-準備が整いましたら、上記リンクよりご参加ください。
+まだ受験されていない場合は、期限までに受験を完了してください。
 ご不明な点がございましたら、お気軽にお問い合わせください。
 
 {{company_name}}

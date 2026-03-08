@@ -13,6 +13,8 @@ import {
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/components/providers/auth-provider";
 import { createClient } from "@/lib/supabase/client";
+import { LoadingScreen } from "@/components/ui/loading-screen";
+import { DatePicker } from "@/components/ui/date-picker";
 import type { Candidate, CandidateCareer, CandidateEducation, CandidateSkill, CandidateDocument } from "@/types";
 
 interface CareerForm {
@@ -136,7 +138,7 @@ export default function ProfilePage() {
 
   const removeSkill = (id: string) => setSkills((prev) => prev.filter((s) => s.id !== id));
 
-  if (loading) return <p className="text-sm text-text-muted p-6">プロフィールを取得できませんでした</p>;
+  if (loading) return <LoadingScreen />;
 
   if (!candidate) {
     return (
@@ -179,7 +181,7 @@ export default function ProfilePage() {
             </div>
             <div>
               <label className={labelClass}>生年月日</label>
-              <input type="date" value={dateOfBirth} onChange={(e) => setDateOfBirth(e.target.value)} className={inputClass} />
+              <DatePicker value={dateOfBirth} onChange={setDateOfBirth} placeholder="生年月日を選択" />
             </div>
             <div>
               <label className={labelClass}>性別</label>
@@ -346,7 +348,7 @@ export default function ProfilePage() {
           </div>
           <div>
             <label className={labelClass}>入社可能日</label>
-            <input type="date" value={availableFrom} onChange={(e) => setAvailableFrom(e.target.value)} className={inputClass} />
+            <DatePicker value={availableFrom} onChange={setAvailableFrom} placeholder="入社可能日を選択" />
           </div>
         </div>
       </section>

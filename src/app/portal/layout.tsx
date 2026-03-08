@@ -8,6 +8,7 @@ import { useAuth } from "@/components/providers/auth-provider";
 
 const navItems = [
   { label: "マイページ", href: "/portal" },
+  { label: "面接", href: "/portal/interviews" },
   { label: "プロフィール", href: "/portal/profile" },
   { label: "メッセージ", href: "/portal/messages" },
 ];
