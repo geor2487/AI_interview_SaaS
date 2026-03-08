@@ -1,29 +1,12 @@
-import { createServerClient } from "@supabase/ssr";
-import { cookies } from "next/headers";
+import { createClient } from "@supabase/supabase-js";
 import { NextRequest, NextResponse } from "next/server";
 import { randomUUID } from "crypto";
 
 export async function POST(request: NextRequest) {
-  const cookieStore = await cookies();
-  const supabase = createServerClient(
+  // Use admin client to bypass RLS (candidates are not org members)
+  const supabase = createClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.SUPABASE_SERVICE_ROLE_KEY!,
-    {
-      cookies: {
-        getAll() {
-          return cookieStore.getAll();
-        },
-        setAll(cookiesToSet) {
-          try {
-            cookiesToSet.forEach(({ name, value, options }) =>
-              cookieStore.set(name, value, options)
-            );
-          } catch {
-            // Server Component — ignore
-          }
-        },
-      },
-    }
+    process.env.SUPABASE_SERVICE_ROLE_KEY!
   );
 
   let formData: FormData;
@@ -79,7 +62,7 @@ export async function POST(request: NextRequest) {
   if (uploadError) {
     console.error("Upload error:", uploadError);
     return NextResponse.json(
-      { error: "Failed to upload recording" },
+      { error: `Failed to upload recording: ${uploadError.message}` },
       { status: 500 }
     );
   }
@@ -100,7 +83,7 @@ export async function POST(request: NextRequest) {
     // Clean up uploaded file
     await supabase.storage.from("recordings").remove([storagePath]);
     return NextResponse.json(
-      { error: "Failed to create recording entry" },
+      { error: `Failed to create recording entry: ${dbError.message}` },
       { status: 500 }
     );
   }

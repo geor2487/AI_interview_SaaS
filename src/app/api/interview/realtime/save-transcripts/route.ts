@@ -50,7 +50,7 @@ export async function POST(request: Request) {
     if (insertError) {
       console.error('Transcript insert error:', insertError)
       return NextResponse.json(
-        { error: 'Failed to save transcripts' },
+        { error: `Failed to save transcripts: ${insertError.message}` },
         { status: 500 }
       )
     }
@@ -68,7 +68,7 @@ export async function POST(request: Request) {
   } catch (error) {
     console.error('Save transcripts error:', error)
     return NextResponse.json(
-      { error: 'Failed to save transcripts' },
+      { error: `Failed to save transcripts: ${error instanceof Error ? error.message : String(error)}` },
       { status: 500 }
     )
   }

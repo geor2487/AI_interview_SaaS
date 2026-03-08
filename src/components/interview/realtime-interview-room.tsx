@@ -46,15 +46,29 @@ export function RealtimeInterviewRoom({
     startInterview(interviewId)
   }, [interviewId, startInterview])
 
-  // Camera + Recording
+  const audioContextRef = useRef<AudioContext | null>(null)
+  const audioDestRef = useRef<MediaStreamAudioDestinationNode | null>(null)
+
+  // Camera + Audio setup
   useEffect(() => {
     async function initCamera() {
       try {
-        const stream = await navigator.mediaDevices.getUserMedia({ video: true, audio: false })
+        const stream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true })
         mediaStreamRef.current = stream
         if (videoRef.current) {
           videoRef.current.srcObject = stream
+          videoRef.current.muted = true // prevent echo
         }
+
+        // Create AudioContext to mix candidate mic + AI audio for recording
+        const audioCtx = new AudioContext()
+        audioContextRef.current = audioCtx
+        const dest = audioCtx.createMediaStreamDestination()
+        audioDestRef.current = dest
+
+        // Add candidate mic audio to mix
+        const micSource = audioCtx.createMediaStreamSource(stream)
+        micSource.connect(dest)
       } catch {
         setCameraOn(false)
       }
@@ -62,17 +76,41 @@ export function RealtimeInterviewRoom({
     initCamera()
     return () => {
       mediaStreamRef.current?.getTracks().forEach((t) => t.stop())
+      audioContextRef.current?.close()
     }
   }, [])
 
-  // Start recording when connected
+  // Capture AI audio into the mix when remote track arrives
   useEffect(() => {
-    if (status !== 'connected' || !mediaStreamRef.current) return
+    if (status !== 'connected' || !audioContextRef.current || !audioDestRef.current) return
+
+    // Find the <audio> element playing AI voice (created by the hook via ontrack)
+    const audioElements = document.querySelectorAll('audio')
+    audioElements.forEach((audioEl) => {
+      if (audioEl.srcObject && audioContextRef.current && audioDestRef.current) {
+        try {
+          const aiSource = audioContextRef.current.createMediaStreamSource(audioEl.srcObject as MediaStream)
+          aiSource.connect(audioDestRef.current)
+        } catch {
+          // Already connected or invalid stream
+        }
+      }
+    })
+  }, [status])
+
+  // Start recording when connected (video + mixed audio)
+  useEffect(() => {
+    if (status !== 'connected' || !mediaStreamRef.current || !audioDestRef.current) return
 
     try {
-      const recorder = new MediaRecorder(mediaStreamRef.current, {
-        mimeType: MediaRecorder.isTypeSupported('video/webm;codecs=vp9')
-          ? 'video/webm;codecs=vp9'
+      // Combine video tracks + mixed audio track
+      const videoTracks = mediaStreamRef.current.getVideoTracks()
+      const mixedAudioTracks = audioDestRef.current.stream.getAudioTracks()
+      const combinedStream = new MediaStream([...videoTracks, ...mixedAudioTracks])
+
+      const recorder = new MediaRecorder(combinedStream, {
+        mimeType: MediaRecorder.isTypeSupported('video/webm;codecs=vp9,opus')
+          ? 'video/webm;codecs=vp9,opus'
           : 'video/webm',
       })
       chunksRef.current = []
@@ -144,9 +182,11 @@ export function RealtimeInterviewRoom({
   // Redirect on evaluation complete
   useEffect(() => {
     if (status === 'evaluated') {
-      router.push('/interview/complete')
+      const answeredQuestions = currentQuestionIndex + 1
+      const minutes = Math.ceil(elapsed / 60)
+      router.push(`/interview/complete?questions=${answeredQuestions}&minutes=${minutes}`)
     }
-  }, [status, router])
+  }, [status, router, currentQuestionIndex, elapsed])
 
   const formatTime = (s: number) => {
     const m = Math.floor(s / 60)
@@ -162,7 +202,7 @@ export function RealtimeInterviewRoom({
   }
 
   const handleEndInterview = async () => {
-    uploadRecording()
+    await uploadRecording()
     mediaStreamRef.current?.getTracks().forEach((t) => t.stop())
     await endInterview()
   }
@@ -287,31 +327,17 @@ export function RealtimeInterviewRoom({
       </header>
 
       {/* Main Area */}
-      <main className="flex-1 flex items-stretch p-6 gap-6 overflow-hidden">
-        {/* Left: AI Section */}
-        <div className="flex-[3] flex flex-col items-center justify-center gap-6 max-w-2xl mx-auto relative">
-          {/* Camera Preview (small, bottom-right) */}
-          <div className="absolute bottom-4 right-4 z-10">
-            <div
-              className="w-40 h-30 rounded-lg overflow-hidden border-2 border-zinc-700 shadow-lg"
-              style={{ background: '#18181b' }}
-            >
-              {cameraOn ? (
-                <video
-                  ref={videoRef}
-                  autoPlay
-                  muted
-                  playsInline
-                  className="w-full h-full object-cover"
-                  style={{ transform: 'scaleX(-1)' }}
-                />
-              ) : (
-                <div className="w-full h-full flex items-center justify-center">
-                  <VideoOff className="h-5 w-5 text-zinc-500" />
-                </div>
-              )}
-            </div>
-          </div>
+      <main className="flex-1 flex items-center justify-center p-6 overflow-hidden">
+        {/* AI Section */}
+        <div className="flex flex-col items-center justify-center gap-6 w-full max-w-2xl relative">
+          {/* Hidden video element for recording */}
+          <video
+            ref={videoRef}
+            autoPlay
+            muted
+            playsInline
+            className="hidden"
+          />
           {/* AI Avatar */}
           <div className="relative">
             <div
@@ -384,56 +410,6 @@ export function RealtimeInterviewRoom({
           </div>
         </div>
 
-        {/* Right: Transcript */}
-        <div
-          className="flex-[2] flex flex-col rounded-xl overflow-hidden max-w-md"
-          style={{ background: '#18181b', border: '1px solid #27272a' }}
-        >
-          <div
-            className="px-4 py-3 text-xs font-medium shrink-0"
-            style={{ borderBottom: '1px solid #27272a', color: '#818cf8' }}
-          >
-            会話ログ
-          </div>
-          <div className="flex-1 overflow-y-auto p-4 space-y-3">
-            {transcripts.map((t, i) => (
-              <div
-                key={i}
-                className={cn(
-                  'flex',
-                  t.speaker === 'candidate' ? 'justify-end' : 'justify-start'
-                )}
-              >
-                <div
-                  className={cn(
-                    'max-w-[85%] rounded-lg px-3 py-2 text-sm',
-                    t.speaker === 'candidate'
-                      ? 'bg-indigo-600/20 text-indigo-200'
-                      : 'bg-zinc-800 text-zinc-300'
-                  )}
-                >
-                  <div className="text-[10px] font-medium mb-1" style={{ color: '#71717a' }}>
-                    {t.speaker === 'ai' ? 'AI面接官' : '候補者'}
-                  </div>
-                  {t.content}
-                </div>
-              </div>
-            ))}
-            {/* Show live AI subtitle in transcript */}
-            {aiSubtitle && (
-              <div className="flex justify-start">
-                <div className="max-w-[85%] rounded-lg px-3 py-2 text-sm bg-zinc-800 text-zinc-400">
-                  <div className="text-[10px] font-medium mb-1" style={{ color: '#71717a' }}>
-                    AI面接官
-                  </div>
-                  {aiSubtitle}
-                  <span className="inline-block w-1 h-3 bg-zinc-400 animate-pulse ml-0.5" />
-                </div>
-              </div>
-            )}
-            <div ref={transcriptEndRef} />
-          </div>
-        </div>
       </main>
 
       {/* Bottom Bar */}

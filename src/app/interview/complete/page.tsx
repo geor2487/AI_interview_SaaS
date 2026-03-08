@@ -1,8 +1,20 @@
 "use client";
 
+import { Suspense } from "react";
+import { useSearchParams } from "next/navigation";
 import { Video, CheckCircle2, Clock, HelpCircle } from "lucide-react";
 
-export default function InterviewCompletePage() {
+function CompleteContent() {
+  const searchParams = useSearchParams();
+  const questions = searchParams.get("questions") || "—";
+  const minutes = searchParams.get("minutes");
+
+  const durationLabel = minutes
+    ? Number(minutes) < 1
+      ? "1分未満"
+      : `約${minutes}分`
+    : "—";
+
   return (
     <div className="min-h-screen flex flex-col items-center justify-center bg-background px-4 py-12">
       {/* Branding */}
@@ -36,16 +48,16 @@ export default function InterviewCompletePage() {
             <div className="flex items-center justify-between rounded-lg border border-border-sub bg-background px-4 py-3">
               <div className="flex items-center gap-2.5">
                 <HelpCircle className="h-4 w-4 text-text-muted" />
-                <span className="text-sm text-text-sub">質問数</span>
+                <span className="text-sm text-text-sub">回答した質問数</span>
               </div>
-              <span className="text-sm font-semibold text-foreground">10問</span>
+              <span className="text-sm font-semibold text-foreground">{questions}問</span>
             </div>
             <div className="flex items-center justify-between rounded-lg border border-border-sub bg-background px-4 py-3">
               <div className="flex items-center gap-2.5">
                 <Clock className="h-4 w-4 text-text-muted" />
                 <span className="text-sm text-text-sub">所要時間</span>
               </div>
-              <span className="text-sm font-semibold text-foreground">約15分</span>
+              <span className="text-sm font-semibold text-foreground">{durationLabel}</span>
             </div>
           </div>
 
@@ -71,5 +83,13 @@ export default function InterviewCompletePage() {
         InterviewAI &copy; 2026. All rights reserved.
       </p>
     </div>
+  );
+}
+
+export default function InterviewCompletePage() {
+  return (
+    <Suspense>
+      <CompleteContent />
+    </Suspense>
   );
 }

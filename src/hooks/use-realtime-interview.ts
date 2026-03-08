@@ -211,9 +211,7 @@ export function useRealtimeInterview(): UseRealtimeInterviewReturn {
           )
           setCurrentQuestionIndex(questionIndexRef.current)
         }
-        // Reset subtitle
-        aiSubtitleRef.current = ''
-        setAiSubtitle('')
+        // Keep subtitle visible — it will be cleared when next response starts
         break
       }
 
@@ -232,8 +230,8 @@ export function useRealtimeInterview(): UseRealtimeInterviewReturn {
       // Response started
       case 'response.created': {
         setIsAiSpeaking(true)
+        // Don't clear subtitle here — let delta overwrite naturally
         aiSubtitleRef.current = ''
-        setAiSubtitle('')
         break
       }
 
@@ -284,6 +282,7 @@ export function useRealtimeInterview(): UseRealtimeInterviewReturn {
 
       // Save transcripts
       const currentTranscripts = transcriptsRef.current
+      console.log('[EndInterview] transcripts count:', currentTranscripts.length, currentTranscripts)
       if (currentTranscripts.length > 0) {
         const saveRes = await fetch('/api/interview/realtime/save-transcripts', {
           method: 'POST',
