@@ -16,17 +16,6 @@ export function RealtimeInterviewRoom({
   interviewId,
 }: RealtimeInterviewRoomProps) {
   const router = useRouter()
-  const {
-    status,
-    currentQuestionIndex,
-    totalQuestions,
-    transcripts,
-    isAiSpeaking,
-    aiSubtitle,
-    error,
-    startInterview,
-    endInterview,
-  } = useRealtimeInterview()
 
   const [micMuted, setMicMuted] = useState(false)
   const [cameraOn, setCameraOn] = useState(true)
@@ -38,6 +27,42 @@ export function RealtimeInterviewRoom({
   const mediaStreamRef = useRef<MediaStream | null>(null)
   const mediaRecorderRef = useRef<MediaRecorder | null>(null)
   const chunksRef = useRef<Blob[]>([])
+
+  const uploadRecording = useCallback(async () => {
+    if (mediaRecorderRef.current && mediaRecorderRef.current.state !== 'inactive') {
+      mediaRecorderRef.current.stop()
+    }
+    // Wait for final chunks
+    await new Promise((r) => setTimeout(r, 500))
+
+    console.log('[Recording] chunks:', chunksRef.current.length)
+    if (chunksRef.current.length === 0) return
+    const blob = new Blob(chunksRef.current, { type: 'video/webm' })
+    const formData = new FormData()
+    formData.append('video', blob, `interview-${interviewId}.webm`)
+    formData.append('interview_id', interviewId)
+
+    try {
+      await fetch('/api/recordings/upload', { method: 'POST', body: formData })
+    } catch (err) {
+      console.error('Recording upload failed:', err)
+    }
+  }, [interviewId])
+
+  const {
+    status,
+    currentQuestionIndex,
+    totalQuestions,
+    transcripts,
+    isAiSpeaking,
+    aiSubtitle,
+    error,
+    remoteStream,
+    startInterview,
+    endInterview,
+  } = useRealtimeInterview({
+    onBeforeEnd: uploadRecording,
+  })
 
   // Auto-start interview
   useEffect(() => {
@@ -80,27 +105,21 @@ export function RealtimeInterviewRoom({
     }
   }, [])
 
-  // Capture AI audio into the mix when remote track arrives
+  // Capture AI audio into the mix when remote stream arrives
   useEffect(() => {
-    if (status !== 'connected' || !audioContextRef.current || !audioDestRef.current) return
+    if (!remoteStream || !audioContextRef.current || !audioDestRef.current) return
 
-    // Find the <audio> element playing AI voice (created by the hook via ontrack)
-    const audioElements = document.querySelectorAll('audio')
-    audioElements.forEach((audioEl) => {
-      if (audioEl.srcObject && audioContextRef.current && audioDestRef.current) {
-        try {
-          const aiSource = audioContextRef.current.createMediaStreamSource(audioEl.srcObject as MediaStream)
-          aiSource.connect(audioDestRef.current)
-        } catch {
-          // Already connected or invalid stream
-        }
-      }
-    })
-  }, [status])
+    try {
+      const aiSource = audioContextRef.current.createMediaStreamSource(remoteStream)
+      aiSource.connect(audioDestRef.current)
+    } catch {
+      // Already connected or invalid stream
+    }
+  }, [remoteStream])
 
-  // Start recording when connected (video + mixed audio)
+  // Start recording when connected and remote stream is available
   useEffect(() => {
-    if (status !== 'connected' || !mediaStreamRef.current || !audioDestRef.current) return
+    if (status !== 'connected' || !mediaStreamRef.current || !audioDestRef.current || !remoteStream) return
 
     try {
       // Combine video tracks + mixed audio track
@@ -119,30 +138,11 @@ export function RealtimeInterviewRoom({
       }
       recorder.start(1000)
       mediaRecorderRef.current = recorder
-    } catch {
-      // recording not supported
-    }
-  }, [status])
-
-  const uploadRecording = useCallback(async () => {
-    if (mediaRecorderRef.current && mediaRecorderRef.current.state !== 'inactive') {
-      mediaRecorderRef.current.stop()
-    }
-    // Wait for final chunks
-    await new Promise((r) => setTimeout(r, 500))
-
-    if (chunksRef.current.length === 0) return
-    const blob = new Blob(chunksRef.current, { type: 'video/webm' })
-    const formData = new FormData()
-    formData.append('video', blob, `interview-${interviewId}.webm`)
-    formData.append('interview_id', interviewId)
-
-    try {
-      await fetch('/api/recordings/upload', { method: 'POST', body: formData })
+      console.log('[Recording] started with', videoTracks.length, 'video +', mixedAudioTracks.length, 'audio tracks')
     } catch (err) {
-      console.error('Recording upload failed:', err)
+      console.error('[Recording] failed to start:', err)
     }
-  }, [interviewId])
+  }, [status, remoteStream])
 
   const handleCameraToggle = () => {
     if (mediaStreamRef.current) {
@@ -202,9 +202,8 @@ export function RealtimeInterviewRoom({
   }
 
   const handleEndInterview = async () => {
-    await uploadRecording()
-    mediaStreamRef.current?.getTracks().forEach((t) => t.stop())
     await endInterview()
+    mediaStreamRef.current?.getTracks().forEach((t) => t.stop())
   }
 
   const getStatusLabel = (): string => {

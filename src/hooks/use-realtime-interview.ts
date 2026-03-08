@@ -20,11 +20,16 @@ interface UseRealtimeInterviewReturn {
   aiSubtitle: string
   error: string | null
   questions: Question[]
+  remoteStream: MediaStream | null
   startInterview: (interviewId: string) => Promise<void>
   endInterview: () => Promise<void>
 }
 
-export function useRealtimeInterview(): UseRealtimeInterviewReturn {
+interface UseRealtimeInterviewOptions {
+  onBeforeEnd?: () => Promise<void>
+}
+
+export function useRealtimeInterview(options?: UseRealtimeInterviewOptions): UseRealtimeInterviewReturn {
   const [status, setStatus] = useState<RealtimeStatus>('idle')
   const [currentQuestionIndex, setCurrentQuestionIndex] = useState(0)
   const [totalQuestions, setTotalQuestions] = useState(0)
@@ -33,6 +38,10 @@ export function useRealtimeInterview(): UseRealtimeInterviewReturn {
   const [aiSubtitle, setAiSubtitle] = useState('')
   const [error, setError] = useState<string | null>(null)
   const [questions, setQuestions] = useState<Question[]>([])
+  const [remoteStream, setRemoteStream] = useState<MediaStream | null>(null)
+
+  const onBeforeEndRef = useRef(options?.onBeforeEnd)
+  onBeforeEndRef.current = options?.onBeforeEnd
 
   const pcRef = useRef<RTCPeerConnection | null>(null)
   const dcRef = useRef<RTCDataChannel | null>(null)
@@ -40,6 +49,7 @@ export function useRealtimeInterview(): UseRealtimeInterviewReturn {
   const transcriptsRef = useRef<TranscriptEntry[]>([])
   const aiSubtitleRef = useRef('')
   const questionIndexRef = useRef(0)
+  const pendingEndRef = useRef(false)
 
   // Keep transcriptsRef in sync
   useEffect(() => {
@@ -95,6 +105,7 @@ export function useRealtimeInterview(): UseRealtimeInterviewReturn {
       audioEl.autoplay = true
       pc.ontrack = (event) => {
         audioEl.srcObject = event.streams[0]
+        setRemoteStream(event.streams[0])
       }
 
       // 4. Get local audio and add track
@@ -235,6 +246,18 @@ export function useRealtimeInterview(): UseRealtimeInterviewReturn {
         break
       }
 
+      // AI audio generation complete (all audio data sent to browser)
+      case 'response.audio.done': {
+        if (pendingEndRef.current) {
+          pendingEndRef.current = false
+          // Audio data is done generating; add buffer for playback to finish
+          setTimeout(() => {
+            endInterviewInternal()
+          }, 5000)
+        }
+        break
+      }
+
       // Response done - AI finished a full response
       case 'response.done': {
         setIsAiSpeaking(false)
@@ -249,10 +272,15 @@ export function useRealtimeInterview(): UseRealtimeInterviewReturn {
           lastTranscript.includes('以上で面接を終了いたします') ||
           lastTranscript.includes('お疲れ様でした')
         ) {
-          // Auto-end after AI finishes final statement
+          // Flag for ending; actual end triggered by response.audio.done
+          pendingEndRef.current = true
+          // Fallback: if response.audio.done never fires, end after 10s
           setTimeout(() => {
-            endInterviewInternal()
-          }, 2000)
+            if (pendingEndRef.current) {
+              pendingEndRef.current = false
+              endInterviewInternal()
+            }
+          }, 10000)
         }
         break
       }
@@ -274,6 +302,13 @@ export function useRealtimeInterview(): UseRealtimeInterviewReturn {
   const endInterviewInternal = useCallback(async () => {
     const interviewId = interviewIdRef.current
     if (!interviewId) return
+
+    // Call onBeforeEnd (e.g. upload recording) before cleanup
+    if (onBeforeEndRef.current) {
+      try { await onBeforeEndRef.current() } catch (err) {
+        console.error('[EndInterview] onBeforeEnd error:', err)
+      }
+    }
 
     cleanup()
 
@@ -331,6 +366,7 @@ export function useRealtimeInterview(): UseRealtimeInterviewReturn {
     aiSubtitle,
     error,
     questions,
+    remoteStream,
     startInterview,
     endInterview,
   }
