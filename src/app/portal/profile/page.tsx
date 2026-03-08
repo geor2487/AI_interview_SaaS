@@ -54,7 +54,7 @@ const labelClass = "block text-[13px] font-medium text-foreground mb-1.5";
 const sectionTitle = "text-base font-semibold text-foreground mb-4";
 
 export default function ProfilePage() {
-  const { user } = useAuth();
+  const { user, loading: authLoading } = useAuth();
   const [candidate, setCandidate] = useState<Candidate | null>(null);
   const [careers, setCareers] = useState<CareerForm[]>([]);
   const [educations, setEducations] = useState<EducationForm[]>([]);
@@ -80,7 +80,10 @@ export default function ProfilePage() {
   const [availableFrom, setAvailableFrom] = useState("");
 
   useEffect(() => {
-    if (!user) return;
+    if (!user) {
+      if (!authLoading) setLoading(false);
+      return;
+    }
 
     fetch("/api/portal/profile")
       .then((res) => res.json())
@@ -131,7 +134,7 @@ export default function ProfilePage() {
         setLoading(false);
       })
       .catch(() => setLoading(false));
-  }, [user]);
+  }, [user, authLoading]);
 
   const addCareer = () => {
     setCareers((prev) => [

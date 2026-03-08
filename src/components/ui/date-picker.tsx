@@ -64,7 +64,7 @@ export function DatePicker({
       </button>
 
       {open && (
-        <div className="absolute z-50 mt-1 rounded-xl border border-border bg-surface p-3 shadow-lg">
+        <div className="absolute z-50 mt-1 rounded-xl border border-border bg-white p-3 shadow-lg">
           <DayPicker
             mode="single"
             locale={ja}
@@ -161,7 +161,7 @@ export function DateTimePicker({
       </button>
 
       {open && (
-        <div className="absolute z-50 mt-1 rounded-xl border border-border bg-surface p-3 shadow-lg">
+        <div className="absolute z-50 mt-1 rounded-xl border border-border bg-white p-3 shadow-lg">
           <DayPicker
             mode="single"
             locale={ja}

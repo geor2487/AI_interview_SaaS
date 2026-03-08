@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import { FileUp, Loader2, Mail, Plus, Search, Sparkles, X } from "lucide-react";
+import { FileUp, Loader2, Mail, Plus, Search, Sparkles, Trash2, X } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { LoadingScreen } from "@/components/ui/loading-screen";
 import type { Candidate, CandidateStatus } from "@/types";
@@ -33,6 +33,25 @@ export default function CandidatesPage() {
   const [search, setSearch] = useState("");
   const [showModal, setShowModal] = useState(false);
   const [showInviteModal, setShowInviteModal] = useState(false);
+  const [deleting, setDeleting] = useState<string | null>(null);
+
+  const handleDelete = async (id: string, name: string) => {
+    if (!confirm(`「${name}」を削除しますか？関連データもすべて削除されます。`)) return;
+    setDeleting(id);
+    try {
+      const res = await fetch(`/api/candidates/${id}`, { method: "DELETE" });
+      if (!res.ok) {
+        const data = await res.json();
+        alert(data.error || "削除に失敗しました。");
+        return;
+      }
+      setCandidates((prev) => prev.filter((c) => c.id !== id));
+    } catch {
+      alert("削除中にエラーが発生しました。");
+    } finally {
+      setDeleting(null);
+    }
+  };
 
   const fetchCandidates = () => {
     fetch("/api/candidates")
@@ -122,6 +141,7 @@ export default function CandidatesPage() {
                 <th className="px-5 py-3 font-medium">希望ポジション</th>
                 <th className="px-5 py-3 font-medium">ステータス</th>
                 <th className="px-5 py-3 font-medium">登録日</th>
+                <th className="px-5 py-3 font-medium w-16"></th>
               </tr>
             </thead>
             <tbody>
@@ -143,6 +163,16 @@ export default function CandidatesPage() {
                     </td>
                     <td className="px-5 py-3 text-text-muted">
                       {new Date(c.created_at).toLocaleDateString("ja-JP")}
+                    </td>
+                    <td className="px-5 py-3">
+                      <button
+                        onClick={() => handleDelete(c.id, c.name)}
+                        disabled={deleting === c.id}
+                        className="rounded-md p-1.5 text-text-muted hover:text-red hover:bg-red-bg transition-colors disabled:opacity-50"
+                        title="削除"
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </button>
                     </td>
                   </tr>
                 );

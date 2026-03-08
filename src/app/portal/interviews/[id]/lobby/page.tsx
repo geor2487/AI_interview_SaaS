@@ -15,7 +15,6 @@ import {
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/components/providers/auth-provider";
-import { createClient } from "@/lib/supabase/client";
 import { canStartInterview } from "@/lib/interview/deadline";
 
 interface DeviceStatus {
@@ -35,7 +34,7 @@ export default function InterviewLobbyPage() {
   const router = useRouter();
   const params = useParams();
   const interviewId = params.id as string;
-  const { user } = useAuth();
+  const { user, loading: authLoading } = useAuth();
 
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -52,90 +51,35 @@ export default function InterviewLobbyPage() {
   const videoRef = useRef<HTMLVideoElement>(null);
   const streamRef = useRef<MediaStream | null>(null);
 
-  // Fetch interview and verify ownership
+  // Fetch interview and verify ownership via API (service role bypasses RLS)
   useEffect(() => {
-    if (!user) return;
-    const supabase = createClient();
+    if (!user) {
+      if (!authLoading) setLoading(false);
+      return;
+    }
 
     (async () => {
-      // Get candidate record
-      const { data: candidate } = await supabase
-        .from("candidates")
-        .select("id")
-        .eq("user_id", user.id)
-        .single();
+      try {
+        const res = await fetch(`/api/portal/interviews/${interviewId}/lobby`);
+        const data = await res.json();
 
-      if (!candidate) {
-        setError("候補者情報が見つかりません");
-        setLoading(false);
-        return;
-      }
-
-      // Get interview
-      const { data: interview } = await supabase
-        .from("interviews")
-        .select("id, status, deadline_at, candidate_id, organization_id")
-        .eq("id", interviewId)
-        .single();
-
-      if (!interview) {
-        setError("面接情報が見つかりません");
-        setLoading(false);
-        return;
-      }
-
-      // Verify ownership
-      if (interview.candidate_id !== candidate.id) {
-        setError("この面接へのアクセス権限がありません");
-        setLoading(false);
-        return;
-      }
-
-      // Check if can start
-      const check = canStartInterview(interview.status, interview.deadline_at);
-      setStartAllowed(check.allowed);
-      setDisableReason(check.reason);
-
-      // Fetch interview_guidelines: question_set override > organization default
-      let guidelinesText: string | null = null;
-
-      // Try question_set-level guidelines first
-      const { data: iqsRows } = await supabase
-        .from("interview_question_sets")
-        .select("question_set_id")
-        .eq("interview_id", interviewId)
-        .order("order_index", { ascending: true })
-        .limit(1);
-
-      if (iqsRows && iqsRows.length > 0) {
-        const { data: qs } = await supabase
-          .from("question_sets")
-          .select("interview_guidelines")
-          .eq("id", iqsRows[0].question_set_id)
-          .single();
-
-        if (qs?.interview_guidelines) {
-          guidelinesText = qs.interview_guidelines;
+        if (!res.ok) {
+          setError(data.error ?? "面接情報の取得に失敗しました");
+          setLoading(false);
+          return;
         }
+
+        const check = canStartInterview(data.status, data.deadline_at);
+        setStartAllowed(check.allowed);
+        setDisableReason(check.reason);
+        setGuidelines(data.guidelines);
+      } catch {
+        setError("面接情報の取得に失敗しました");
+      } finally {
+        setLoading(false);
       }
-
-      // Fallback to organization-level guidelines
-      if (!guidelinesText) {
-        const { data: org } = await supabase
-          .from("organizations")
-          .select("interview_guidelines")
-          .eq("id", interview.organization_id)
-          .single();
-
-        if (org?.interview_guidelines) {
-          guidelinesText = org.interview_guidelines;
-        }
-      }
-
-      setGuidelines(guidelinesText);
-      setLoading(false);
     })();
-  }, [user, interviewId]);
+  }, [user, authLoading, interviewId]);
 
   // Device check
   const checkDevices = useCallback(async () => {

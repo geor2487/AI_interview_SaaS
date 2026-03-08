@@ -36,15 +36,19 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [loading, setLoading] = useState(true)
 
   const fetchMember = useCallback(async (userId: string) => {
-    const supabase = createClient()
-    const { data, error } = await supabase
-      .from("members")
-      .select("*, organizations(*)")
-      .eq("user_id", userId)
-      .single<Member & { organizations: Organization }>()
+    try {
+      const supabase = createClient()
+      const { data, error } = await supabase
+        .from("members")
+        .select("*, organizations(*)")
+        .eq("user_id", userId)
+        .maybeSingle<Member & { organizations: Organization }>()
 
-    if (!error && data) {
-      setMember(data)
+      if (!error && data) {
+        setMember(data)
+      }
+    } catch {
+      // 候補者ユーザーなどmembersに存在しない場合は無視
     }
   }, [])
 
@@ -53,15 +57,19 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
     // Get initial session
     const init = async () => {
-      const {
-        data: { session },
-      } = await supabase.auth.getSession()
+      try {
+        const {
+          data: { session },
+        } = await supabase.auth.getSession()
 
-      if (session?.user) {
-        setUser(session.user)
-        await fetchMember(session.user.id)
+        if (session?.user) {
+          setUser(session.user)
+          // fetchMember はバックグラウンドで実行（loading をブロックしない）
+          fetchMember(session.user.id)
+        }
+      } finally {
+        setLoading(false)
       }
-      setLoading(false)
     }
 
     init()
@@ -72,7 +80,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     } = supabase.auth.onAuthStateChange(async (event, session) => {
       if (session?.user) {
         setUser(session.user)
-        await fetchMember(session.user.id)
+        fetchMember(session.user.id)
       } else {
         setUser(null)
         setMember(null)

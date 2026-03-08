@@ -102,7 +102,7 @@ export function PrintReport(props: PrintReportProps) {
               <h1 style={{ fontSize: "20px", fontWeight: 700, margin: 0, color: "#6366f1" }}>InterviewAI</h1>
               <p style={{ fontSize: "14px", fontWeight: 600, margin: "4px 0 0" }}>面接評価レポート</p>
             </div>
-            <p style={{ fontSize: "10px", color: "#888" }}>
+            <p style={{ fontSize: "10px", color: "#888" }} suppressHydrationWarning>
               出力日時: {new Date().toLocaleString("ja-JP")}
             </p>
           </div>

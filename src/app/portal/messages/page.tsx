@@ -1,20 +1,11 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { Send, Paperclip, Search } from "lucide-react";
+import { Send, Paperclip } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { LoadingScreen } from "@/components/ui/loading-screen";
 import { useAuth } from "@/components/providers/auth-provider";
-import { createClient } from "@/lib/supabase/client";
 import type { Message } from "@/types";
-
-interface Thread {
-  candidateId: string;
-  orgId: string;
-  senderName: string;
-  lastMessage: string;
-  lastTime: string;
-}
 
 export default function MessagesPage() {
   const { user } = useAuth();
@@ -23,17 +14,16 @@ export default function MessagesPage() {
   const [inputValue, setInputValue] = useState("");
 
   useEffect(() => {
-    if (!user) return;
-    const supabase = createClient();
-    supabase
-      .from("messages")
-      .select("*")
-      .order("created_at", { ascending: true })
-      .then(({ data }) => {
-        setMessages(data ?? []);
+    fetch("/api/portal/messages")
+      .then((res) => res.json())
+      .then((data) => {
+        setMessages(data.messages ?? []);
+        setLoading(false);
+      })
+      .catch(() => {
         setLoading(false);
       });
-  }, [user]);
+  }, []);
 
   return (
     <div>

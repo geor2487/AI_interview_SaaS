@@ -2,12 +2,21 @@
 
 import { useState, type FormEvent } from "react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
-import { createClient } from "@/lib/supabase/client";
+import { useSearchParams } from "next/navigation";
+import { Suspense } from "react";
 import { cn } from "@/lib/utils";
 
 export default function LoginPage() {
-  const router = useRouter();
+  return (
+    <Suspense>
+      <LoginForm />
+    </Suspense>
+  );
+}
+
+function LoginForm() {
+  const searchParams = useSearchParams();
+  const redirect = searchParams.get("redirect");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
@@ -19,28 +28,38 @@ export default function LoginPage() {
     setLoading(true);
 
     try {
-      const supabase = createClient();
-      const { error: authError } = await supabase.auth.signInWithPassword({
-        email,
-        password,
+      const res = await fetch("/api/auth/login", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email, password }),
       });
 
-      if (authError) {
-        setError(authError.message);
+      const data = await res.json();
+
+      if (!res.ok) {
+        setError(data.error || "ログインに失敗しました。");
+        setLoading(false);
         return;
       }
 
-      router.push("/dashboard");
+      // redirect パラメータがあればそちらへ、なければ role に応じてリダイレクト
+      if (redirect) {
+        window.location.href = redirect;
+      } else {
+        // ログイン後にメンバー情報を確認してリダイレクト先を決定
+        const memberRes = await fetch("/api/auth/me");
+        const memberData = memberRes.ok ? await memberRes.json() : null;
+        window.location.href = memberData?.role ? "/dashboard" : "/portal";
+      }
     } catch {
       setError("ログイン中にエラーが発生しました。");
-    } finally {
       setLoading(false);
     }
   };
 
   return (
     <div className="w-full max-w-sm">
-      {/* Logo */}
+      {/* Logo -- LoginForm */}
       <div className="flex flex-col items-center mb-8">
         <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-violet-500 to-indigo-600 flex items-center justify-center mb-3">
           <svg

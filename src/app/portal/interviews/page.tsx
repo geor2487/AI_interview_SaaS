@@ -11,7 +11,6 @@ import {
 import { LoadingScreen } from "@/components/ui/loading-screen";
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/components/providers/auth-provider";
-import { createClient } from "@/lib/supabase/client";
 import {
   formatDeadline,
   formatDeadlineDate,
@@ -52,58 +51,39 @@ const statusConfig: Record<
 };
 
 export default function InterviewsPage() {
-  const { user } = useAuth();
+  const { user, loading: authLoading } = useAuth();
   const router = useRouter();
 
   const [interviews, setInterviews] = useState<InterviewRow[]>([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState("");
 
   useEffect(() => {
-    if (!user) return;
-    const supabase = createClient();
+    if (authLoading) return;
+    if (!user) {
+      setLoading(false);
+      return;
+    }
 
     (async () => {
-      const { data: candidate } = await supabase
-        .from("candidates")
-        .select("id")
-        .eq("user_id", user.id)
-        .single();
-
-      if (!candidate) {
+      try {
+        const res = await fetch("/api/portal/interviews");
+        if (res.ok) {
+          const data = await res.json();
+          setInterviews(Array.isArray(data) ? data : []);
+        } else {
+          const errData = await res.json().catch(() => null);
+          console.error("面接取得エラー:", res.status, errData);
+          setError("面接情報の取得に失敗しました。ページを再読み込みしてください。");
+        }
+      } catch (err) {
+        console.error("面接取得エラー:", err);
+        setError("面接情報の取得に失敗しました。ページを再読み込みしてください。");
+      } finally {
         setLoading(false);
-        return;
       }
-
-      const { data: interviewRows } = await supabase
-        .from("interviews")
-        .select("id, status, deadline_at, created_at, organization_id")
-        .eq("candidate_id", candidate.id)
-        .order("created_at", { ascending: false });
-
-      if (!interviewRows || interviewRows.length === 0) {
-        setLoading(false);
-        return;
-      }
-
-      const orgIds = [...new Set(interviewRows.map((i) => i.organization_id))];
-      const { data: orgs } = await supabase
-        .from("organizations")
-        .select("id, name")
-        .in("id", orgIds);
-
-      const orgMap = new Map(
-        (orgs ?? []).map((o) => [o.id, o.name as string])
-      );
-
-      setInterviews(
-        interviewRows.map((row) => ({
-          ...row,
-          org_name: orgMap.get(row.organization_id) ?? "不明な企業",
-        }))
-      );
-      setLoading(false);
     })();
-  }, [user]);
+  }, [user, authLoading]);
 
   return (
     <div className="space-y-8">
@@ -116,6 +96,11 @@ export default function InterviewsPage() {
 
       {loading ? (
         <LoadingScreen />
+      ) : error ? (
+        <div className="rounded-2xl border border-red/20 bg-red-bg p-8 text-center space-y-2">
+          <AlertCircle className="h-6 w-6 text-red mx-auto" />
+          <p className="text-sm text-red">{error}</p>
+        </div>
       ) : interviews.length === 0 ? (
         <div className="rounded-2xl border border-border bg-surface p-8 text-center space-y-2">
           <p className="text-sm text-text-muted">

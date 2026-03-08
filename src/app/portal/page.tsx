@@ -14,7 +14,6 @@ import {
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/components/providers/auth-provider";
-import { createClient } from "@/lib/supabase/client";
 import {
   formatDeadline,
   formatDeadlineDate,
@@ -56,7 +55,7 @@ const statusConfig: Record<
 };
 
 export default function PortalPage() {
-  const { user } = useAuth();
+  const { user, loading: authLoading } = useAuth();
   const router = useRouter();
   const fullName = user?.user_metadata?.full_name ?? "ユーザー";
 
@@ -64,54 +63,24 @@ export default function PortalPage() {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    if (!user) return;
-    const supabase = createClient();
+    if (authLoading) return;
+    if (!user) {
+      setLoading(false);
+      return;
+    }
 
     (async () => {
-      // 1. Get candidate record
-      const { data: candidate } = await supabase
-        .from("candidates")
-        .select("id")
-        .eq("user_id", user.id)
-        .single();
-
-      if (!candidate) {
+      try {
+        const res = await fetch("/api/portal/interviews");
+        if (res.ok) {
+          const data = await res.json();
+          setInterviews(data);
+        }
+      } finally {
         setLoading(false);
-        return;
       }
-
-      // 2. Get interviews
-      const { data: interviewRows } = await supabase
-        .from("interviews")
-        .select("id, status, deadline_at, created_at, organization_id")
-        .eq("candidate_id", candidate.id)
-        .order("created_at", { ascending: false });
-
-      if (!interviewRows || interviewRows.length === 0) {
-        setLoading(false);
-        return;
-      }
-
-      // 3. Get organization names
-      const orgIds = [...new Set(interviewRows.map((i) => i.organization_id))];
-      const { data: orgs } = await supabase
-        .from("organizations")
-        .select("id, name")
-        .in("id", orgIds);
-
-      const orgMap = new Map(
-        (orgs ?? []).map((o) => [o.id, o.name as string])
-      );
-
-      const mapped: InterviewRow[] = interviewRows.map((row) => ({
-        ...row,
-        org_name: orgMap.get(row.organization_id) ?? "不明な企業",
-      }));
-
-      setInterviews(mapped);
-      setLoading(false);
     })();
-  }, [user]);
+  }, [user, authLoading]);
 
   return (
     <div className="space-y-8">

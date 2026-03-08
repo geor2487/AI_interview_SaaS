@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server'
-import { createServerClient } from '@supabase/ssr'
-import { cookies } from 'next/headers'
+import { createClient } from '@/lib/supabase/server'
+import { createClient as createServiceClient } from '@supabase/supabase-js'
 import { buildInterviewSystemPrompt } from '@/lib/openai/chat'
 import type { Question } from '@/types/index'
 
@@ -15,24 +15,17 @@ export async function POST(request: Request) {
       )
     }
 
-    const cookieStore = await cookies()
-    const supabase = createServerClient(
+    // 認証チェック
+    const authSupabase = await createClient()
+    const { data: { user } } = await authSupabase.auth.getUser()
+    if (!user) {
+      return NextResponse.json({ error: '認証が必要です。' }, { status: 401 })
+    }
+
+    // Service Role でRLSバイパス
+    const supabase = createServiceClient(
       process.env.NEXT_PUBLIC_SUPABASE_URL!,
-      process.env.SUPABASE_SERVICE_ROLE_KEY!,
-      {
-        cookies: {
-          getAll() {
-            return cookieStore.getAll()
-          },
-          setAll(c) {
-            try {
-              c.forEach(({ name, value, options }) =>
-                cookieStore.set(name, value, options)
-              )
-            } catch {}
-          },
-        },
-      }
+      process.env.SUPABASE_SERVICE_ROLE_KEY!
     )
 
     // Fetch interview
@@ -95,7 +88,7 @@ export async function POST(request: Request) {
         voice: 'alloy',
         instructions: systemPrompt,
         input_audio_transcription: {
-          model: 'gpt-4o-mini-transcription',
+          model: 'gpt-4o-mini-transcribe',
         },
         turn_detection: {
           type: 'server_vad',
@@ -107,9 +100,9 @@ export async function POST(request: Request) {
 
     if (!realtimeRes.ok) {
       const errorText = await realtimeRes.text()
-      console.error('Realtime session creation failed:', errorText)
+      console.error('Realtime session creation failed:', realtimeRes.status, errorText)
       return NextResponse.json(
-        { error: 'Failed to create realtime session' },
+        { error: `Failed to create realtime session: ${realtimeRes.status} ${errorText.slice(0, 200)}` },
         { status: 500 }
       )
     }

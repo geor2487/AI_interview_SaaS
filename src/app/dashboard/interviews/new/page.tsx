@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { ArrowLeft, Copy, Check, Send } from "lucide-react";
+import { ArrowLeft, Send, CheckCircle } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { DateTimePicker } from "@/components/ui/date-picker";
@@ -23,8 +23,7 @@ export default function NewInterviewPage() {
   const [submitting, setSubmitting] = useState(false);
 
   // Result after creation
-  const [inviteUrl, setInviteUrl] = useState<string | null>(null);
-  const [copied, setCopied] = useState(false);
+  const [created, setCreated] = useState(false);
 
   useEffect(() => {
     Promise.all([
@@ -63,19 +62,12 @@ export default function NewInterviewPage() {
         alert(data.error || "面接の作成に失敗しました。");
         return;
       }
-      setInviteUrl(data.invite_url);
+      setCreated(true);
     } catch {
       alert("作成中にエラーが発生しました。");
     } finally {
       setSubmitting(false);
     }
-  };
-
-  const handleCopy = async () => {
-    if (!inviteUrl) return;
-    await navigator.clipboard.writeText(inviteUrl);
-    setCopied(true);
-    setTimeout(() => setCopied(false), 2000);
   };
 
   return (
@@ -87,32 +79,14 @@ export default function NewInterviewPage() {
 
       <h1 className="text-xl font-bold">新規面接作成</h1>
 
-      {inviteUrl ? (
-        /* 作成完了 → 招待リンク表示 */
+      {created ? (
+        /* 作成完了 */
         <div className="rounded-2xl border border-border bg-surface p-6 space-y-5">
-          <div className="rounded-lg bg-green-bg p-4">
-            <p className="text-sm font-medium text-green">面接を作成しました</p>
-          </div>
-
-          <div>
-            <label className="block text-sm font-medium mb-1.5">招待リンク</label>
-            <p className="text-xs text-text-muted mb-2">
-              このリンクを候補者に共有してください。候補者はこのリンクからアカウント作成・面接開始ができます。
-            </p>
-            <div className="flex gap-2">
-              <input
-                type="text"
-                readOnly
-                value={inviteUrl}
-                className="flex-1 rounded-lg border border-border bg-background px-3 py-2.5 text-sm outline-none select-all"
-              />
-              <button
-                onClick={handleCopy}
-                className="inline-flex items-center gap-1.5 rounded-lg border border-border px-4 py-2.5 text-sm font-medium hover:bg-accent-light hover:text-accent hover:border-accent/30 transition-colors"
-              >
-                {copied ? <Check className="h-4 w-4" /> : <Copy className="h-4 w-4" />}
-                {copied ? "コピー済" : "コピー"}
-              </button>
+          <div className="rounded-lg bg-green-bg p-4 flex items-center gap-3">
+            <CheckCircle className="h-5 w-5 text-green shrink-0" />
+            <div>
+              <p className="text-sm font-medium text-green">面接が作成されました</p>
+              <p className="text-xs text-green/80 mt-0.5">候補者のポータル画面に面接が表示されます。</p>
             </div>
           </div>
 
@@ -125,7 +99,7 @@ export default function NewInterviewPage() {
             </Link>
             <button
               onClick={() => {
-                setInviteUrl(null);
+                setCreated(false);
                 setSelectedCandidate("");
                 setSelectedQS(new Set());
                 setDeadlineAt("");
@@ -205,7 +179,7 @@ export default function NewInterviewPage() {
             className="inline-flex items-center gap-1.5 rounded-lg bg-accent px-6 py-2.5 text-sm font-medium text-white hover:bg-accent/90 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
           >
             <Send className="h-4 w-4" />
-            {submitting ? "作成中..." : "面接を作成して招待リンクを取得"}
+            {submitting ? "作成中..." : "面接を作成"}
           </button>
         </div>
       )}
