@@ -21,6 +21,7 @@ export function RealtimeInterviewRoom({
   const [cameraOn, setCameraOn] = useState(true)
   const [elapsed, setElapsed] = useState(0)
   const [barHeights, setBarHeights] = useState([40, 60, 80, 50, 35])
+  const [cameraReady, setCameraReady] = useState(false)
   const transcriptEndRef = useRef<HTMLDivElement>(null)
   const startedRef = useRef(false)
   const videoRef = useRef<HTMLVideoElement>(null)
@@ -29,23 +30,38 @@ export function RealtimeInterviewRoom({
   const chunksRef = useRef<Blob[]>([])
 
   const uploadRecording = useCallback(async () => {
-    if (mediaRecorderRef.current && mediaRecorderRef.current.state !== 'inactive') {
-      mediaRecorderRef.current.stop()
+    const recorder = mediaRecorderRef.current
+    if (recorder && recorder.state !== 'inactive') {
+      // Wait for MediaRecorder to fully stop and flush final chunks
+      await new Promise<void>((resolve) => {
+        recorder.onstop = () => resolve()
+        recorder.stop()
+        // Fallback in case onstop never fires
+        setTimeout(resolve, 3000)
+      })
     }
-    // Wait for final chunks
-    await new Promise((r) => setTimeout(r, 500))
 
     console.log('[Recording] chunks:', chunksRef.current.length)
-    if (chunksRef.current.length === 0) return
+    if (chunksRef.current.length === 0) {
+      console.warn('[Recording] No chunks collected — recording may not have started')
+      return
+    }
     const blob = new Blob(chunksRef.current, { type: 'video/webm' })
+    console.log('[Recording] blob size:', blob.size, 'bytes')
     const formData = new FormData()
     formData.append('video', blob, `interview-${interviewId}.webm`)
     formData.append('interview_id', interviewId)
 
     try {
-      await fetch('/api/recordings/upload', { method: 'POST', body: formData })
+      const res = await fetch('/api/recordings/upload', { method: 'POST', body: formData })
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}))
+        console.error('[Recording] Upload failed:', res.status, data)
+      } else {
+        console.log('[Recording] Upload success')
+      }
     } catch (err) {
-      console.error('Recording upload failed:', err)
+      console.error('[Recording] Upload failed:', err)
     }
   }, [interviewId])
 
@@ -94,6 +110,7 @@ export function RealtimeInterviewRoom({
         // Add candidate mic audio to mix
         const micSource = audioCtx.createMediaStreamSource(stream)
         micSource.connect(dest)
+        setCameraReady(true)
       } catch {
         setCameraOn(false)
       }
@@ -117,9 +134,11 @@ export function RealtimeInterviewRoom({
     }
   }, [remoteStream])
 
-  // Start recording when connected and remote stream is available
+  // Start recording when connected and camera is ready (don't wait for remoteStream)
   useEffect(() => {
-    if (status !== 'connected' || !mediaStreamRef.current || !audioDestRef.current || !remoteStream) return
+    if (status !== 'connected' || !cameraReady || !mediaStreamRef.current || !audioDestRef.current) return
+    // Don't start twice
+    if (mediaRecorderRef.current) return
 
     try {
       // Combine video tracks + mixed audio track
@@ -142,7 +161,7 @@ export function RealtimeInterviewRoom({
     } catch (err) {
       console.error('[Recording] failed to start:', err)
     }
-  }, [status, remoteStream])
+  }, [status, cameraReady])
 
   const handleCameraToggle = () => {
     if (mediaStreamRef.current) {
