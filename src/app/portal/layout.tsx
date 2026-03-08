@@ -25,7 +25,7 @@ export default function PortalLayout({
   return (
     <div className="min-h-screen bg-background">
       {/* Top Navigation */}
-      <header className="sticky top-0 z-50 h-14 bg-surface border-b border-border">
+      <header className="sticky top-0 z-50 h-14 bg-white/60 backdrop-blur-xl border-b border-white/30">
         <div className="max-w-5xl mx-auto h-full px-6 flex items-center justify-between">
           {/* Logo */}
           <div className="flex items-center gap-2.5">

@@ -1,7 +1,7 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { parseResumeText } from "@/lib/openai/resume-parser";
-import * as pdfParseModule from "pdf-parse";
+// pdf-parse is loaded dynamically to avoid build-time test file loading issue
 
 export async function POST(request: NextRequest) {
   const supabase = await createClient();
@@ -30,8 +30,9 @@ export async function POST(request: NextRequest) {
 
     if (file.type === "application/pdf") {
       const buffer = Buffer.from(await file.arrayBuffer());
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const pdfParse = (pdfParseModule as any).default ?? pdfParseModule;
+      // Import lib directly to avoid pdf-parse test file loading issue
+      // eslint-disable-next-line @typescript-eslint/no-require-imports
+      const pdfParse = require("pdf-parse/lib/pdf-parse");
       const pdfData = await pdfParse(buffer);
       text = pdfData.text;
     } else if (

@@ -89,7 +89,7 @@ export default function NewInterviewPage() {
 
       {inviteUrl ? (
         /* 作成完了 → 招待リンク表示 */
-        <div className="rounded-lg border border-border bg-surface p-6 space-y-5">
+        <div className="rounded-2xl border border-border bg-surface p-6 space-y-5">
           <div className="rounded-lg bg-green-bg p-4">
             <p className="text-sm font-medium text-green">面接を作成しました</p>
           </div>
@@ -138,7 +138,7 @@ export default function NewInterviewPage() {
         </div>
       ) : (
         /* 作成フォーム */
-        <div className="rounded-lg border border-border bg-surface p-6 space-y-6">
+        <div className="rounded-2xl border border-border bg-surface p-6 space-y-6">
           {/* 候補者選択 */}
           <div>
             <label className="block text-sm font-medium mb-1.5">候補者選択</label>

@@ -95,5 +95,12 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: error.message }, { status: 500 });
   }
 
+  // パターンB: 手動登録時に invitations レコードも作成（後から招待リンク送信可能にする）
+  await supabase.from("invitations").insert({
+    organization_id: member.organization_id,
+    email: email.toLowerCase(),
+    candidate_id: data.id,
+  });
+
   return NextResponse.json(data);
 }

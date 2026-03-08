@@ -16,11 +16,37 @@ export async function GET(
     return NextResponse.json({ error: "認証が必要です。" }, { status: 401 });
   }
 
-  const { data, error } = await supabase
-    .from("question_sets")
-    .select("id, title, description, questions(*)")
-    .eq("id", id)
+  // Verify user belongs to an organization
+  const { data: member } = await supabase
+    .from("members")
+    .select("organization_id")
+    .eq("user_id", user.id)
     .single();
+
+  if (!member) {
+    return NextResponse.json(
+      { error: "組織メンバー情報が見つかりません。" },
+      { status: 403 }
+    );
+  }
+
+  // Try with interview_guidelines first, fallback without it
+  let data, error;
+  ({ data, error } = await supabase
+    .from("question_sets")
+    .select("id, title, description, interview_guidelines, questions(*)")
+    .eq("id", id)
+    .eq("organization_id", member.organization_id)
+    .single());
+
+  if (error?.message?.includes("interview_guidelines")) {
+    ({ data, error } = await supabase
+      .from("question_sets")
+      .select("id, title, description, questions(*)")
+      .eq("id", id)
+      .eq("organization_id", member.organization_id)
+      .single());
+  }
 
   if (error || !data) {
     return NextResponse.json(
@@ -48,12 +74,26 @@ export async function PATCH(
   }
 
   const body = await request.json();
-  const { title, description } = body;
+  const { title, description, interview_guidelines } = body;
 
-  const { error } = await supabase
+  const updateData: Record<string, unknown> = { title, description };
+  if (interview_guidelines !== undefined) {
+    updateData.interview_guidelines = interview_guidelines;
+  }
+
+  let { error } = await supabase
     .from("question_sets")
-    .update({ title, description })
+    .update(updateData)
     .eq("id", id);
+
+  // Retry without interview_guidelines if column doesn't exist yet
+  if (error?.message?.includes("interview_guidelines")) {
+    delete updateData.interview_guidelines;
+    ({ error } = await supabase
+      .from("question_sets")
+      .update(updateData)
+      .eq("id", id));
+  }
 
   if (error) {
     return NextResponse.json({ error: error.message }, { status: 500 });

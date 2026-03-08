@@ -82,7 +82,7 @@ export default function InterviewsPage() {
       </div>
 
       {/* Table */}
-      <div className="rounded-lg border border-border bg-surface">
+      <div className="rounded-2xl border border-border bg-surface">
         {loading ? (
           <LoadingScreen />
         ) : filtered.length === 0 ? (

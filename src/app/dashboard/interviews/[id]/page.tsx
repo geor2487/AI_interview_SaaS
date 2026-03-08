@@ -173,7 +173,7 @@ export default function InterviewDetailPage() {
       </Link>
 
       {/* Header */}
-      <div className="flex items-center justify-between rounded-lg border border-border bg-surface p-5 print:hidden">
+      <div className="flex items-center justify-between rounded-2xl border border-border bg-surface p-5 print:hidden">
         <div className="flex items-center gap-4">
           <div className="flex h-12 w-12 items-center justify-center rounded-full bg-gradient-to-br from-accent to-purple-500 text-lg font-bold text-white">
             {candidateInitial}
@@ -268,7 +268,7 @@ export default function InterviewDetailPage() {
           )}
 
           {!loading && activeTab === "recording" && (
-            <div className="rounded-lg border border-border bg-surface p-5">
+            <div className="rounded-2xl border border-border bg-surface p-5">
               {recordingLoading ? (
                 <div className="flex h-48 items-center justify-center text-sm text-text-muted">
                   録画データを確認中...
@@ -295,7 +295,7 @@ export default function InterviewDetailPage() {
           <h3 className="text-sm font-semibold">質問別スコア</h3>
           {questionScores.length > 0 ? (
             questionScores.map((q, i) => (
-              <div key={i} className="rounded-lg border border-border bg-surface p-3">
+              <div key={i} className="rounded-2xl border border-border bg-surface p-3">
                 <div className="flex items-center justify-between mb-1.5">
                   <span className="text-xs text-text-sub font-medium truncate max-w-[70%]">Q{i + 1}. {q.question}</span>
                   <span className={cn("rounded-full px-2 py-0.5 text-xs font-bold", scoreBg(q.score))}>
@@ -311,7 +311,7 @@ export default function InterviewDetailPage() {
               </div>
             ))
           ) : (
-            <div className="rounded-lg border border-border bg-surface p-3">
+            <div className="rounded-2xl border border-border bg-surface p-3">
               <p className="text-xs text-text-muted">評価データがまだありません</p>
             </div>
           )}

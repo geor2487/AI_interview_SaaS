@@ -116,8 +116,11 @@ export default function SettingsPage() {
   const [address, setAddress] = useState("");
   const [phone, setPhone] = useState("");
   const [website, setWebsite] = useState("");
+  const [interviewGuidelines, setInterviewGuidelines] = useState("");
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
+  const [guidelinesSaving, setGuidelinesSaving] = useState(false);
+  const [guidelinesSaved, setGuidelinesSaved] = useState(false);
   const [editingTemplate, setEditingTemplate] = useState<EmailTemplateKey | null>(null);
   const [templateSubject, setTemplateSubject] = useState("");
   const [templateBody, setTemplateBody] = useState("");
@@ -142,6 +145,7 @@ export default function SettingsPage() {
       setAddress(organization.address ?? "");
       setPhone(organization.phone ?? "");
       setWebsite(organization.website ?? "");
+      setInterviewGuidelines(organization.interview_guidelines ?? "");
     }
   }, [organization]);
 
@@ -197,7 +201,7 @@ export default function SettingsPage() {
         {/* Right content */}
         <div className="col-span-3">
           {activeSection === "org" && (
-            <div className="rounded-lg border border-border bg-surface p-6 space-y-5">
+            <div className="rounded-2xl border border-border bg-surface p-6 space-y-5">
               <h2 className="text-base font-semibold">組織情報</h2>
               <div className="space-y-4">
                 <div>
@@ -257,9 +261,48 @@ export default function SettingsPage() {
           )}
 
           {activeSection === "interview" && (
-            <div className="rounded-lg border border-border bg-surface p-6 space-y-5">
+            <div className="rounded-2xl border border-border bg-surface p-6 space-y-5">
               <h2 className="text-base font-semibold">面接設定</h2>
               <div className="space-y-4">
+                <div>
+                  <label className="block text-sm font-medium mb-1.5">面接時の注意事項（デフォルト）</label>
+                  <p className="text-xs text-text-muted mb-2">
+                    候補者が面接開始前のロビーで確認する注意事項です。質問セットごとに上書きも可能です。
+                  </p>
+                  <textarea
+                    value={interviewGuidelines}
+                    onChange={(e) => setInterviewGuidelines(e.target.value)}
+                    rows={6}
+                    placeholder="例: スーツ着用でご参加ください。静かな環境でご受験ください。"
+                    className={cn(inputClass, "resize-y leading-relaxed")}
+                  />
+                </div>
+                <div className="flex items-center gap-3 pt-2">
+                  <button
+                    onClick={async () => {
+                      if (!orgId) return;
+                      setGuidelinesSaving(true);
+                      setGuidelinesSaved(false);
+                      const supabase = createClient();
+                      await supabase
+                        .from("organizations")
+                        .update({ interview_guidelines: interviewGuidelines || null })
+                        .eq("id", orgId);
+                      setGuidelinesSaving(false);
+                      setGuidelinesSaved(true);
+                      setTimeout(() => setGuidelinesSaved(false), 2000);
+                    }}
+                    disabled={guidelinesSaving}
+                    className="inline-flex items-center gap-1.5 rounded-lg bg-accent px-5 py-2.5 text-sm font-medium text-white hover:bg-accent/90 transition-colors disabled:opacity-50"
+                  >
+                    <Save className="h-4 w-4" />
+                    {guidelinesSaving ? "保存中..." : "保存する"}
+                  </button>
+                  {guidelinesSaved && (
+                    <span className="text-sm text-green">保存しました</span>
+                  )}
+                </div>
+                <hr className="border-border" />
                 <div>
                   <label className="block text-sm font-medium mb-1.5">デフォルトの面接時間（分）</label>
                   <input type="number" defaultValue={30} min={10} max={120} className={inputClass} />
@@ -289,7 +332,7 @@ export default function SettingsPage() {
           )}
 
           {activeSection === "evaluation" && (
-            <div className="rounded-lg border border-border bg-surface p-6 space-y-5">
+            <div className="rounded-2xl border border-border bg-surface p-6 space-y-5">
               <h2 className="text-base font-semibold">評価設定</h2>
               <div className="space-y-4">
                 <div>
@@ -320,7 +363,7 @@ export default function SettingsPage() {
           )}
 
           {activeSection === "notification" && (
-            <div className="rounded-lg border border-border bg-surface p-6 space-y-5">
+            <div className="rounded-2xl border border-border bg-surface p-6 space-y-5">
               <h2 className="text-base font-semibold">通知</h2>
               <div className="space-y-4">
                 <p className="text-sm text-text-muted">通知の受信方法とタイミングを設定します。</p>
@@ -351,7 +394,7 @@ export default function SettingsPage() {
           )}
 
           {activeSection === "email" && (
-            <div className="rounded-lg border border-border bg-surface p-6 space-y-5">
+            <div className="rounded-2xl border border-border bg-surface p-6 space-y-5">
               {editingTemplate === null ? (
                 <>
                   <h2 className="text-base font-semibold">メールテンプレート</h2>
@@ -442,7 +485,7 @@ export default function SettingsPage() {
           )}
 
           {activeSection === "members" && (
-            <div className="rounded-lg border border-border bg-surface p-6 space-y-5">
+            <div className="rounded-2xl border border-border bg-surface p-6 space-y-5">
               <h2 className="text-base font-semibold">メンバー</h2>
               <div className="space-y-4">
                 <div className="flex items-center justify-between">

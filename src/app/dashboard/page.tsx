@@ -131,14 +131,14 @@ export default function DashboardPage() {
   return (
     <div className="space-y-6 max-w-6xl">
       {/* Welcome banner */}
-      <div className="rounded-xl bg-gradient-to-r from-accent to-purple-500 p-6 text-white">
+      <div className="rounded-2xl bg-gradient-to-r from-accent to-purple-500 p-6 text-white shadow-lg shadow-accent/20">
         <h1 className="text-xl font-bold">おはようございます、{fullName}さん</h1>
         <p className="mt-1 text-sm text-white/80">{dateStr}</p>
       </div>
 
       {/* Stats */}
       <div className="grid grid-cols-2 gap-4">
-        <div className="rounded-lg border border-border bg-surface p-5">
+        <div className="rounded-2xl border border-border bg-surface p-6">
           <h2 className="text-sm font-semibold text-text-sub mb-4">パイプライン</h2>
           {loading ? (
             <LoadingScreen />
@@ -161,7 +161,7 @@ export default function DashboardPage() {
         </div>
 
         {/* スコア推移 */}
-        <div className="rounded-lg border border-border bg-surface p-5">
+        <div className="rounded-2xl border border-border bg-surface p-6">
           <h2 className="text-sm font-semibold text-text-sub mb-4 flex items-center gap-1.5">
             <BarChart3 className="h-4 w-4" />
             スコア推移
@@ -182,8 +182,8 @@ export default function DashboardPage() {
       </div>
 
       {/* Recent interviews table */}
-      <div className="rounded-lg border border-border bg-surface">
-        <div className="border-b border-border px-5 py-3">
+      <div className="rounded-2xl border border-border bg-surface">
+        <div className="border-b border-border px-6 py-4">
           <h2 className="text-sm font-semibold">最近の面接</h2>
         </div>
         {loading ? (

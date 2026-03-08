@@ -105,7 +105,7 @@ export default function CandidateDetailPage() {
         {/* Left 60% */}
         <div className="col-span-3 space-y-5">
           {/* 基本情報 */}
-          <div className="rounded-lg border border-border bg-surface p-5">
+          <div className="rounded-2xl border border-border bg-surface p-5">
             <h2 className="text-sm font-semibold mb-4">基本情報</h2>
             <div className="flex items-start gap-4">
               <div className="flex h-14 w-14 items-center justify-center rounded-full bg-gradient-to-br from-accent to-purple-500 text-lg font-bold text-white shrink-0">
@@ -154,7 +154,7 @@ export default function CandidateDetailPage() {
           {(candidate.desired_position ||
             candidate.desired_salary ||
             candidate.available_from) && (
-            <div className="rounded-lg border border-border bg-surface p-5">
+            <div className="rounded-2xl border border-border bg-surface p-5">
               <h2 className="text-sm font-semibold mb-4">希望条件</h2>
               <div className="grid grid-cols-2 gap-3 text-sm">
                 {candidate.desired_position && (
@@ -190,7 +190,7 @@ export default function CandidateDetailPage() {
 
           {/* 自己紹介 */}
           {candidate.self_introduction && (
-            <div className="rounded-lg border border-border bg-surface p-5">
+            <div className="rounded-2xl border border-border bg-surface p-5">
               <h2 className="text-sm font-semibold mb-3">自己紹介・自己PR</h2>
               <p className="text-sm text-text-sub whitespace-pre-wrap leading-relaxed">
                 {candidate.self_introduction}
@@ -200,7 +200,7 @@ export default function CandidateDetailPage() {
 
           {/* 学歴・職歴 */}
           {(education.length > 0 || careers.length > 0) && (
-            <div className="rounded-lg border border-border bg-surface p-5">
+            <div className="rounded-2xl border border-border bg-surface p-5">
               <h2 className="text-sm font-semibold mb-4">学歴・職歴</h2>
               <div className="space-y-0">
                 {education.length > 0 && (
@@ -257,7 +257,7 @@ export default function CandidateDetailPage() {
 
           {/* スキル */}
           {skills.length > 0 && (
-            <div className="rounded-lg border border-border bg-surface p-5">
+            <div className="rounded-2xl border border-border bg-surface p-5">
               <h2 className="text-sm font-semibold mb-4">スキル</h2>
               <div className="space-y-3">
                 {skills.map((s) => (
@@ -282,7 +282,7 @@ export default function CandidateDetailPage() {
         {/* Right 40% */}
         <div className="col-span-2 space-y-5">
           {/* 面接履歴 */}
-          <div className="rounded-lg border border-border bg-surface p-5">
+          <div className="rounded-2xl border border-border bg-surface p-5">
             <h2 className="text-sm font-semibold mb-4">面接履歴</h2>
             {interviews.length === 0 ? (
               <p className="text-sm text-text-muted">面接履歴がありません。</p>
@@ -318,7 +318,7 @@ export default function CandidateDetailPage() {
           </div>
 
           {/* 提出書類 */}
-          <div className="rounded-lg border border-border bg-surface p-5">
+          <div className="rounded-2xl border border-border bg-surface p-5">
             <h2 className="text-sm font-semibold mb-4">提出書類</h2>
             {documents.length === 0 ? (
               <p className="text-sm text-text-muted">書類がありません。</p>

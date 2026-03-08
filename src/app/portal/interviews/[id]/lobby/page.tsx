@@ -23,7 +23,7 @@ interface DeviceStatus {
   mic: "checking" | "ready" | "error";
 }
 
-const cautions = [
+const defaultCautions = [
   "静かな環境でご参加ください",
   "カメラとマイクの使用を許可してください",
   "ブラウザを閉じないでください",
@@ -42,6 +42,7 @@ export default function InterviewLobbyPage() {
   const [starting, setStarting] = useState(false);
   const [startAllowed, setStartAllowed] = useState(false);
   const [disableReason, setDisableReason] = useState<string>();
+  const [guidelines, setGuidelines] = useState<string | null>(null);
 
   const [deviceStatus, setDeviceStatus] = useState<DeviceStatus>({
     camera: "checking",
@@ -73,7 +74,7 @@ export default function InterviewLobbyPage() {
       // Get interview
       const { data: interview } = await supabase
         .from("interviews")
-        .select("id, status, deadline_at, candidate_id")
+        .select("id, status, deadline_at, candidate_id, organization_id")
         .eq("id", interviewId)
         .single();
 
@@ -95,6 +96,43 @@ export default function InterviewLobbyPage() {
       setStartAllowed(check.allowed);
       setDisableReason(check.reason);
 
+      // Fetch interview_guidelines: question_set override > organization default
+      let guidelinesText: string | null = null;
+
+      // Try question_set-level guidelines first
+      const { data: iqsRows } = await supabase
+        .from("interview_question_sets")
+        .select("question_set_id")
+        .eq("interview_id", interviewId)
+        .order("order_index", { ascending: true })
+        .limit(1);
+
+      if (iqsRows && iqsRows.length > 0) {
+        const { data: qs } = await supabase
+          .from("question_sets")
+          .select("interview_guidelines")
+          .eq("id", iqsRows[0].question_set_id)
+          .single();
+
+        if (qs?.interview_guidelines) {
+          guidelinesText = qs.interview_guidelines;
+        }
+      }
+
+      // Fallback to organization-level guidelines
+      if (!guidelinesText) {
+        const { data: org } = await supabase
+          .from("organizations")
+          .select("interview_guidelines")
+          .eq("id", interview.organization_id)
+          .single();
+
+        if (org?.interview_guidelines) {
+          guidelinesText = org.interview_guidelines;
+        }
+      }
+
+      setGuidelines(guidelinesText);
       setLoading(false);
     })();
   }, [user, interviewId]);
@@ -295,8 +333,13 @@ export default function InterviewLobbyPage() {
         <h2 className="text-base font-semibold text-foreground mb-4">
           注意事項
         </h2>
+        {guidelines && (
+          <div className="rounded-lg border border-accent/20 bg-accent-light px-4 py-3 mb-3">
+            <p className="text-sm text-accent-text whitespace-pre-wrap">{guidelines}</p>
+          </div>
+        )}
         <div className="rounded-lg border border-yellow/20 bg-yellow-bg px-4 py-3 space-y-2">
-          {cautions.map((text, i) => (
+          {defaultCautions.map((text, i) => (
             <div key={i} className="flex items-start gap-2.5">
               <AlertTriangle className="h-3.5 w-3.5 text-yellow mt-0.5 shrink-0" />
               <span className="text-sm text-yellow">{text}</span>

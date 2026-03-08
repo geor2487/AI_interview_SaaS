@@ -1,6 +1,7 @@
 export type Role = "admin" | "interviewer";
 export type CandidateStatus = "invited" | "scheduled" | "interviewed" | "evaluated" | "rejected" | "accepted";
 export type InterviewStatus = "pending" | "in_progress" | "completed" | "evaluated";
+export type InvitationStatus = "pending" | "accepted";
 export type SpeakerType = "ai" | "candidate";
 export type SenderType = "admin" | "interviewer" | "candidate" | "system";
 
@@ -10,6 +11,7 @@ export interface Organization {
   address: string | null;
   phone: string | null;
   website: string | null;
+  interview_guidelines: string | null;
   created_at: string;
 }
 
@@ -46,6 +48,7 @@ export interface QuestionSet {
   organization_id: string;
   title: string;
   description: string;
+  interview_guidelines: string | null;
   created_at: string;
   questions?: Question[];
 }
@@ -158,5 +161,15 @@ export interface Message {
   content: string;
   read_at: string | null;
   parent_id: string | null;
+  created_at: string;
+}
+
+export interface Invitation {
+  id: string;
+  organization_id: string;
+  email: string;
+  token: string;
+  candidate_id: string | null;
+  status: InvitationStatus;
   created_at: string;
 }

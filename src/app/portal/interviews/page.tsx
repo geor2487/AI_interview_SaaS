@@ -59,10 +59,7 @@ export default function InterviewsPage() {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    if (!user) {
-      setLoading(false);
-      return;
-    }
+    if (!user) return;
     const supabase = createClient();
 
     (async () => {
@@ -120,9 +117,12 @@ export default function InterviewsPage() {
       {loading ? (
         <LoadingScreen />
       ) : interviews.length === 0 ? (
-        <div className="rounded-lg border border-border bg-surface p-8 text-center">
+        <div className="rounded-2xl border border-border bg-surface p-8 text-center space-y-2">
           <p className="text-sm text-text-muted">
-            現在予定されている面接はありません
+            まだ面接は作成されていません
+          </p>
+          <p className="text-xs text-text-muted">
+            企業の担当者が面接を作成すると、こちらに表示されます。
           </p>
         </div>
       ) : (
@@ -138,7 +138,7 @@ export default function InterviewsPage() {
             return (
               <div
                 key={interview.id}
-                className="rounded-lg border border-border bg-surface p-5"
+                className="rounded-2xl border border-border bg-surface p-5"
               >
                 <div className="flex items-start justify-between gap-4">
                   <div className="flex-1 min-w-0 space-y-2">
@@ -204,7 +204,7 @@ export default function InterviewsPage() {
                     </button>
                     {!startCheck.allowed && startCheck.reason && (
                       <div className="absolute right-0 top-full mt-1 z-10 hidden group-hover:block">
-                        <div className="flex items-center gap-1.5 rounded-lg border border-border bg-surface px-3 py-2 shadow-lg whitespace-nowrap">
+                        <div className="flex items-center gap-1.5 rounded-2xl border border-border bg-surface px-3 py-2 shadow-lg whitespace-nowrap">
                           <AlertCircle className="h-3.5 w-3.5 text-text-muted shrink-0" />
                           <span className="text-xs text-text-sub">
                             {startCheck.reason}

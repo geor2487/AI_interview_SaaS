@@ -17,51 +17,61 @@ export async function POST(request: NextRequest) {
     process.env.SUPABASE_SERVICE_ROLE_KEY!
   );
 
-  // 1. invite_token から interviews テーブルで該当面接を取得
-  const { data: interview, error: interviewError } = await supabase
-    .from("interviews")
-    .select("id, candidate_id")
-    .eq("invite_token", invite_token)
+  // 1. invitations テーブルでトークンを検証
+  const { data: invitation, error: inviteError } = await supabase
+    .from("invitations")
+    .select("id, organization_id, email, candidate_id, status")
+    .eq("token", invite_token)
     .single();
 
-  if (interviewError || !interview) {
+  if (inviteError || !invitation) {
     return NextResponse.json(
       { error: "無効な招待トークンです。" },
       { status: 404 }
     );
   }
 
-  // 2. candidate_id から candidates テーブルでメールアドレスを取得
-  const { data: candidate, error: candidateError } = await supabase
-    .from("candidates")
-    .select("id, email, user_id")
-    .eq("id", interview.candidate_id)
-    .single();
-
-  if (candidateError || !candidate) {
+  if (invitation.status === "accepted") {
     return NextResponse.json(
-      { error: "候補者情報が見つかりません。" },
-      { status: 404 }
+      { error: "この招待は既に使用されています。ログインしてください。" },
+      { status: 400 }
     );
   }
 
-  // 3. メールアドレスの一致を確認
-  if (candidate.email.toLowerCase() !== email.toLowerCase()) {
+  // 2. メールアドレスの一致を確認（リンクのみ招待の場合はスキップ）
+  const isLinkOnly = invitation.email.includes("@placeholder.local");
+  if (!isLinkOnly && invitation.email.toLowerCase() !== email.toLowerCase()) {
     return NextResponse.json(
       { error: "招待されたメールアドレスと一致しません。" },
       { status: 400 }
     );
   }
 
-  // 4. 既にアカウントが存在するか確認
-  if (candidate.user_id) {
-    return NextResponse.json(
-      { error: "既にアカウントが登録されています。ログインしてください。" },
-      { status: 400 }
-    );
+  // リンクのみ招待の場合、招待のメールを更新
+  if (isLinkOnly) {
+    await supabase
+      .from("invitations")
+      .update({ email: email.toLowerCase() })
+      .eq("id", invitation.id);
   }
 
-  // 5. Supabase auth.admin.createUser でユーザー作成
+  // 3. パターンB: 既存の候補者がいる場合、user_id が既に設定されていないか確認
+  if (invitation.candidate_id) {
+    const { data: existingCandidate } = await supabase
+      .from("candidates")
+      .select("id, user_id")
+      .eq("id", invitation.candidate_id)
+      .single();
+
+    if (existingCandidate?.user_id) {
+      return NextResponse.json(
+        { error: "既にアカウントが登録されています。ログインしてください。" },
+        { status: 400 }
+      );
+    }
+  }
+
+  // 4. Supabase auth.admin.createUser でユーザー作成
   const { data: authData, error: authError } =
     await supabase.auth.admin.createUser({
       email,
@@ -71,7 +81,6 @@ export async function POST(request: NextRequest) {
     });
 
   if (authError) {
-    // ユーザーが既に存在する場合
     if (authError.message.includes("already been registered")) {
       return NextResponse.json(
         { error: "既にアカウントが登録されています。ログインしてください。" },
@@ -81,18 +90,55 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: authError.message }, { status: 400 });
   }
 
-  // 6. candidates テーブルの user_id を更新
-  const { error: updateError } = await supabase
-    .from("candidates")
-    .update({ user_id: authData.user.id })
-    .eq("id", candidate.id);
+  // 5. 候補者レコードを作成 or 更新
+  if (invitation.candidate_id) {
+    // パターンB: 既存の候補者の user_id を更新
+    const { error: updateError } = await supabase
+      .from("candidates")
+      .update({ user_id: authData.user.id, name })
+      .eq("id", invitation.candidate_id);
 
-  if (updateError) {
-    return NextResponse.json(
-      { error: "候補者情報の更新に失敗しました: " + updateError.message },
-      { status: 500 }
-    );
+    if (updateError) {
+      return NextResponse.json(
+        { error: "候補者情報の更新に失敗しました: " + updateError.message },
+        { status: 500 }
+      );
+    }
+  } else {
+    // パターンA: 新規候補者レコードを作成
+    const { data: newCandidate, error: insertError } = await supabase
+      .from("candidates")
+      .insert({
+        user_id: authData.user.id,
+        organization_id: invitation.organization_id,
+        name,
+        email: email.toLowerCase(),
+        status: "invited",
+      })
+      .select("id")
+      .single();
+
+    if (insertError || !newCandidate) {
+      return NextResponse.json(
+        { error: "候補者情報の作成に失敗しました: " + insertError?.message },
+        { status: 500 }
+      );
+    }
+
+    // invitation に candidate_id を紐づけ
+    await supabase
+      .from("invitations")
+      .update({ candidate_id: newCandidate.id, status: "accepted" })
+      .eq("id", invitation.id);
+
+    return NextResponse.json({ success: true });
   }
+
+  // パターンBの場合も invitation を accepted に更新
+  await supabase
+    .from("invitations")
+    .update({ status: "accepted" })
+    .eq("id", invitation.id);
 
   return NextResponse.json({ success: true });
 }

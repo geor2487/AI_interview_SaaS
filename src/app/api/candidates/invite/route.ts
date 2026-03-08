@@ -1,5 +1,6 @@
-import { createServerClient } from "@supabase/ssr";
+import { createClient } from "@supabase/supabase-js";
 import { cookies } from "next/headers";
+import { createServerClient } from "@supabase/ssr";
 import { NextRequest, NextResponse } from "next/server";
 import { sendEmail } from "@/lib/email/client";
 import { invitationEmail } from "@/lib/email/templates";
@@ -8,7 +9,7 @@ export async function POST(request: NextRequest) {
   const cookieStore = await cookies();
   const supabase = createServerClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.SUPABASE_SERVICE_ROLE_KEY!,
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
     {
       cookies: {
         getAll() {
@@ -27,6 +28,14 @@ export async function POST(request: NextRequest) {
     }
   );
 
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+
+  if (!user) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+
   let body: { candidate_id: string; method: "email" | "link" };
   try {
     body = await request.json();
@@ -43,8 +52,14 @@ export async function POST(request: NextRequest) {
     );
   }
 
+  // Service Role client to bypass RLS
+  const adminClient = createClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.SUPABASE_SERVICE_ROLE_KEY!
+  );
+
   // Fetch candidate info
-  const { data: candidate, error: candidateError } = await supabase
+  const { data: candidate, error: candidateError } = await adminClient
     .from("candidates")
     .select("id, name, email, organization_id")
     .eq("id", candidate_id)
@@ -57,49 +72,56 @@ export async function POST(request: NextRequest) {
     );
   }
 
-  // Fetch candidate's interview to get the invite_token
-  const { data: interview, error: interviewError } = await supabase
-    .from("interviews")
-    .select("id, invite_token, deadline_at")
-    .eq("candidate_id", candidate_id)
-    .order("created_at", { ascending: false })
-    .limit(1)
-    .single();
-
-  if (interviewError || !interview) {
-    return NextResponse.json(
-      { error: "No interview found for this candidate" },
-      { status: 404 }
-    );
-  }
-
   // Fetch organization name
-  const { data: org } = await supabase
+  const { data: org } = await adminClient
     .from("organizations")
     .select("name")
     .eq("id", candidate.organization_id)
     .single();
 
-  const baseUrl = process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000";
-  const inviteUrl = `${baseUrl}/interview/${interview.invite_token}`;
+  // 既存の pending 招待があるか確認
+  const { data: existingInvite } = await adminClient
+    .from("invitations")
+    .select("id, token")
+    .eq("organization_id", candidate.organization_id)
+    .eq("email", candidate.email.toLowerCase())
+    .eq("status", "pending")
+    .single();
 
-  // Format deadline_at to Japanese date string
-  const deadlineDate = interview.deadline_at
-    ? new Date(interview.deadline_at).toLocaleDateString("ja-JP", {
-        year: "numeric",
-        month: "long",
-        day: "numeric",
-        hour: "2-digit",
-        minute: "2-digit",
+  let token: string;
+
+  if (existingInvite) {
+    token = existingInvite.token;
+  } else {
+    // 新規招待を作成（候補者IDを紐づけ）
+    const { data: invitation, error: insertError } = await adminClient
+      .from("invitations")
+      .insert({
+        organization_id: candidate.organization_id,
+        email: candidate.email.toLowerCase(),
+        candidate_id: candidate.id,
       })
-    : "期限なし";
+      .select("token")
+      .single();
+
+    if (insertError || !invitation) {
+      return NextResponse.json(
+        { error: "招待の作成に失敗しました" },
+        { status: 500 }
+      );
+    }
+
+    token = invitation.token;
+  }
+
+  const baseUrl = process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000";
+  const inviteUrl = `${baseUrl}/invite/${token}`;
 
   if (method === "email") {
     const { subject, body: emailBody } = invitationEmail({
       candidate_name: candidate.name,
       company_name: org?.name ?? "企業",
       interview_url: inviteUrl,
-      deadline_date: deadlineDate,
     });
 
     try {
@@ -117,7 +139,7 @@ export async function POST(request: NextRequest) {
     }
 
     // Update candidate status to invited
-    await supabase
+    await adminClient
       .from("candidates")
       .update({ status: "invited" })
       .eq("id", candidate_id);

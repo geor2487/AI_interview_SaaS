@@ -11,6 +11,7 @@ interface QSData {
   id: string;
   title: string;
   description: string;
+  interview_guidelines: string | null;
 }
 
 export default function QuestionSetDetailPage() {
@@ -22,6 +23,7 @@ export default function QuestionSetDetailPage() {
   const [loading, setLoading] = useState(true);
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
+  const [interviewGuidelines, setInterviewGuidelines] = useState("");
   const [saving, setSaving] = useState(false);
 
   useEffect(() => {
@@ -32,6 +34,7 @@ export default function QuestionSetDetailPage() {
           setQs(data);
           setTitle(data.title);
           setDescription(data.description);
+          setInterviewGuidelines(data.interview_guidelines ?? "");
           const sorted = (data.questions ?? []).sort(
             (a: Question, b: Question) => a.order_index - b.order_index
           );
@@ -47,7 +50,7 @@ export default function QuestionSetDetailPage() {
       const res = await fetch(`/api/question-sets/${qsId}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ title, description }),
+        body: JSON.stringify({ title, description, interview_guidelines: interviewGuidelines || null }),
       });
       if (!res.ok) {
         const data = await res.json();
@@ -78,7 +81,7 @@ export default function QuestionSetDetailPage() {
       <div className="grid grid-cols-5 gap-6">
         {/* Left: Settings */}
         <div className="col-span-2">
-          <div className="rounded-lg border border-border bg-surface p-5 space-y-4 sticky top-6">
+          <div className="rounded-2xl border border-border bg-surface p-5 space-y-4 sticky top-6">
             <h2 className="text-sm font-semibold">基本設定</h2>
             <div className="space-y-3">
               <div>
@@ -97,6 +100,19 @@ export default function QuestionSetDetailPage() {
                   onChange={(e) => setDescription(e.target.value)}
                   rows={4}
                   className="w-full rounded-lg border border-border bg-background px-3 py-2 text-sm outline-none focus:border-accent focus:ring-2 focus:ring-accent/20 transition resize-none"
+                />
+              </div>
+              <div>
+                <label className="block text-xs font-medium text-text-sub mb-1">面接時の注意事項</label>
+                <p className="text-[11px] text-text-muted mb-1.5">
+                  未入力の場合は組織のデフォルト設定が使用されます
+                </p>
+                <textarea
+                  value={interviewGuidelines}
+                  onChange={(e) => setInterviewGuidelines(e.target.value)}
+                  rows={4}
+                  placeholder="例: この面接ではコーディング問題が出題されます"
+                  className="w-full rounded-lg border border-border bg-background px-3 py-2 text-sm outline-none focus:border-accent focus:ring-2 focus:ring-accent/20 transition resize-y"
                 />
               </div>
               <button
@@ -118,7 +134,7 @@ export default function QuestionSetDetailPage() {
             <p className="text-sm text-text-muted">質問がまだ追加されていません。</p>
           ) : (
             questions.map((q) => (
-              <div key={q.id} className="rounded-lg border border-border bg-surface p-4 group hover:border-accent/30 transition">
+              <div key={q.id} className="rounded-2xl border border-border bg-surface p-4 group hover:border-accent/30 transition">
                 <div className="flex items-start gap-3">
                   <div className="flex items-center gap-1 pt-0.5">
                     <GripVertical className="h-4 w-4 text-text-muted cursor-grab" />

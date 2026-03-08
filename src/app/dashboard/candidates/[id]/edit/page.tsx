@@ -397,7 +397,7 @@ export default function CandidateEditPage() {
       <h1 className="text-xl font-bold">候補者情報の編集</h1>
 
       {/* ─── プロフィール完成度 ─── */}
-      <section className="rounded-lg border border-border bg-surface p-5 space-y-4">
+      <section className="rounded-2xl border border-border bg-surface p-5 space-y-4">
         <div className="flex items-center justify-between">
           <h2 className="text-sm font-semibold">プロフィール完成度</h2>
           <span
@@ -486,7 +486,7 @@ export default function CandidateEditPage() {
       </section>
 
       {/* ─── 基本情報 ─── */}
-      <section className="rounded-lg border border-border bg-surface p-5 space-y-4">
+      <section className="rounded-2xl border border-border bg-surface p-5 space-y-4">
         <h2 className="text-sm font-semibold">基本情報</h2>
         <div className="grid grid-cols-2 gap-4">
           <div>
@@ -527,7 +527,7 @@ export default function CandidateEditPage() {
       </section>
 
       {/* ─── 希望条件 ─── */}
-      <section className="rounded-lg border border-border bg-surface p-5 space-y-4">
+      <section className="rounded-2xl border border-border bg-surface p-5 space-y-4">
         <h2 className="text-sm font-semibold">希望条件</h2>
         <div className="grid grid-cols-2 gap-4">
           <div>
@@ -546,7 +546,7 @@ export default function CandidateEditPage() {
       </section>
 
       {/* ─── 自己紹介 ─── */}
-      <section className="rounded-lg border border-border bg-surface p-5 space-y-4">
+      <section className="rounded-2xl border border-border bg-surface p-5 space-y-4">
         <h2 className="text-sm font-semibold">自己紹介・自己PR</h2>
         <textarea
           value={selfIntroduction}
@@ -558,7 +558,7 @@ export default function CandidateEditPage() {
       </section>
 
       {/* ─── 学歴 ─── */}
-      <section className="rounded-lg border border-border bg-surface p-5 space-y-4">
+      <section className="rounded-2xl border border-border bg-surface p-5 space-y-4">
         <div className="flex items-center justify-between">
           <h2 className="text-sm font-semibold">学歴</h2>
           <button
@@ -609,7 +609,7 @@ export default function CandidateEditPage() {
       </section>
 
       {/* ─── 職歴 ─── */}
-      <section className="rounded-lg border border-border bg-surface p-5 space-y-4">
+      <section className="rounded-2xl border border-border bg-surface p-5 space-y-4">
         <div className="flex items-center justify-between">
           <h2 className="text-sm font-semibold">職歴</h2>
           <button
@@ -660,7 +660,7 @@ export default function CandidateEditPage() {
       </section>
 
       {/* ─── スキル ─── */}
-      <section className="rounded-lg border border-border bg-surface p-5 space-y-4">
+      <section className="rounded-2xl border border-border bg-surface p-5 space-y-4">
         <div className="flex items-center justify-between">
           <h2 className="text-sm font-semibold">スキル</h2>
           <button

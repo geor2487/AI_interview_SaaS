@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import { FileUp, Loader2, Plus, Search, Sparkles, X } from "lucide-react";
+import { FileUp, Loader2, Mail, Plus, Search, Sparkles, X } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { LoadingScreen } from "@/components/ui/loading-screen";
 import type { Candidate, CandidateStatus } from "@/types";
@@ -32,6 +32,7 @@ export default function CandidatesPage() {
   const [activeTab, setActiveTab] = useState<CandidateStatus | "all">("all");
   const [search, setSearch] = useState("");
   const [showModal, setShowModal] = useState(false);
+  const [showInviteModal, setShowInviteModal] = useState(false);
 
   const fetchCandidates = () => {
     fetch("/api/candidates")
@@ -57,13 +58,22 @@ export default function CandidatesPage() {
       {/* Header */}
       <div className="flex items-center justify-between">
         <h1 className="text-xl font-bold">候補者一覧</h1>
-        <button
-          onClick={() => setShowModal(true)}
-          className="inline-flex items-center gap-1.5 rounded-lg bg-accent px-4 py-2 text-sm font-medium text-white hover:bg-accent/90 transition-colors"
-        >
-          <Plus className="h-4 w-4" />
-          新規追加
-        </button>
+        <div className="flex items-center gap-2">
+          <button
+            onClick={() => setShowInviteModal(true)}
+            className="inline-flex items-center gap-1.5 rounded-lg border border-accent text-accent px-4 py-2 text-sm font-medium hover:bg-accent/5 transition-colors"
+          >
+            <Mail className="h-4 w-4" />
+            メールで招待
+          </button>
+          <button
+            onClick={() => setShowModal(true)}
+            className="inline-flex items-center gap-1.5 rounded-lg bg-accent px-4 py-2 text-sm font-medium text-white hover:bg-accent/90 transition-colors"
+          >
+            <Plus className="h-4 w-4" />
+            新規追加
+          </button>
+        </div>
       </div>
 
       {/* Tabs */}
@@ -92,12 +102,12 @@ export default function CandidatesPage() {
           placeholder="氏名・メールで検索..."
           value={search}
           onChange={(e) => setSearch(e.target.value)}
-          className="w-full rounded-lg border border-border bg-surface py-2 pl-9 pr-3 text-sm outline-none focus:border-accent focus:ring-2 focus:ring-accent/20 transition"
+          className="w-full rounded-2xl border border-border bg-surface py-2 pl-9 pr-3 text-sm outline-none focus:border-accent focus:ring-2 focus:ring-accent/20 transition"
         />
       </div>
 
       {/* Table */}
-      <div className="rounded-lg border border-border bg-surface">
+      <div className="rounded-2xl border border-border bg-surface">
         {loading ? (
           <LoadingScreen />
         ) : filtered.length === 0 ? (
@@ -150,6 +160,16 @@ export default function CandidatesPage() {
             setShowModal(false);
             setLoading(true);
             fetchCandidates();
+          }}
+        />
+      )}
+
+      {/* Email Invite Modal */}
+      {showInviteModal && (
+        <InviteByEmailModal
+          onClose={() => setShowInviteModal(false)}
+          onSent={() => {
+            setShowInviteModal(false);
           }}
         />
       )}
@@ -371,6 +391,177 @@ function AddCandidateModal({
             >
               {saving ? "登録中..." : "追加する"}
             </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  );
+}
+
+function InviteByEmailModal({
+  onClose,
+  onSent,
+}: {
+  onClose: () => void;
+  onSent: () => void;
+}) {
+  const [email, setEmail] = useState("");
+  const [sending, setSending] = useState(false);
+  const [result, setResult] = useState<{ url?: string; message?: string; error?: string } | null>(null);
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!email) return;
+    setSending(true);
+    setResult(null);
+
+    try {
+      const res = await fetch("/api/invitations", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email, method: "email" }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        setResult({ error: data.error || "送信に失敗しました。" });
+        return;
+      }
+      setResult({ url: data.invite_url, message: data.message });
+    } catch {
+      setResult({ error: "送信中にエラーが発生しました。" });
+    } finally {
+      setSending(false);
+    }
+  };
+
+  const [showLink, setShowLink] = useState(false);
+  const [generatedLink, setGeneratedLink] = useState("");
+  const [copied, setCopied] = useState(false);
+
+  const handleShowLink = async () => {
+    setSending(true);
+    setResult(null);
+
+    try {
+      const res = await fetch("/api/invitations", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email: email || undefined, method: "link" }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        setResult({ error: data.error || "リンク生成に失敗しました。" });
+        return;
+      }
+      setGeneratedLink(data.invite_url);
+      setShowLink(true);
+    } catch {
+      setResult({ error: "リンク生成中にエラーが発生しました。" });
+    } finally {
+      setSending(false);
+    }
+  };
+
+  const handleCopyGeneratedLink = async () => {
+    await navigator.clipboard.writeText(generatedLink);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2000);
+  };
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
+      <div className="w-full max-w-md rounded-xl border border-white/30 bg-white p-6 shadow-xl">
+        <div className="flex items-center justify-between mb-5">
+          <h2 className="text-base font-bold">メールで招待</h2>
+          <button onClick={onClose} className="rounded-md p-1 hover:bg-background text-text-muted transition-colors">
+            <X className="h-4 w-4" />
+          </button>
+        </div>
+
+        <p className="text-sm text-text-sub mb-4">
+          候補者のメールアドレスを入力して招待リンクを送信します。
+          候補者は自分でアカウントを作成し、プロフィールを登録します。
+        </p>
+
+        <form onSubmit={handleSubmit} className="space-y-4">
+          <div>
+            <label className="block text-xs font-medium text-text-sub mb-1">
+              メールアドレス <span className="text-red">*</span>
+            </label>
+            <input
+              type="email"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              placeholder="candidate@example.com"
+              required
+              className="w-full rounded-lg border border-border bg-background px-3 py-2 text-sm outline-none focus:border-accent focus:ring-2 focus:ring-accent/20 transition"
+            />
+          </div>
+
+          {result?.error && (
+            <div className="rounded-lg bg-red-bg px-3 py-2 text-sm text-red">
+              {result.error}
+            </div>
+          )}
+
+          {result?.message && !result.error && (
+            <div className="rounded-lg bg-green-bg px-3 py-2 text-sm text-green">
+              {result.message}
+              {result.url && (
+                <p className="mt-1 text-xs break-all opacity-70">{result.url}</p>
+              )}
+            </div>
+          )}
+
+          {showLink && generatedLink && (
+            <div className="rounded-lg border border-border bg-background p-3 space-y-2">
+              <p className="text-xs font-medium text-text-sub">招待リンク</p>
+              <div className="flex items-center gap-2">
+                <input
+                  type="text"
+                  readOnly
+                  value={generatedLink}
+                  className="flex-1 rounded-md border border-border bg-white px-2 py-1.5 text-xs text-text-sub outline-none"
+                />
+                <button
+                  type="button"
+                  onClick={handleCopyGeneratedLink}
+                  className="shrink-0 rounded-md bg-accent px-3 py-1.5 text-xs font-medium text-white hover:bg-accent/90 transition-colors"
+                >
+                  {copied ? "コピー済" : "コピー"}
+                </button>
+              </div>
+            </div>
+          )}
+
+          <div className="flex justify-end gap-2 pt-2">
+            {result?.message && !result.error ? (
+              <button
+                type="button"
+                onClick={onSent}
+                className="rounded-lg bg-accent px-4 py-2 text-sm font-medium text-white hover:bg-accent/90 transition-colors"
+              >
+                閉じる
+              </button>
+            ) : (
+              <>
+                <button
+                  type="button"
+                  onClick={handleShowLink}
+                  disabled={sending}
+                  className="rounded-lg border border-border px-4 py-2 text-sm font-medium text-text-sub hover:bg-background transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  リンクを表示
+                </button>
+                <button
+                  type="submit"
+                  disabled={sending || !email}
+                  className="rounded-lg bg-accent px-4 py-2 text-sm font-medium text-white hover:bg-accent/90 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  {sending ? "送信中..." : "招待メールを送信"}
+                </button>
+              </>
+            )}
           </div>
         </form>
       </div>

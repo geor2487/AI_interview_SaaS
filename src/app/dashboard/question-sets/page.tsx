@@ -31,29 +31,18 @@ export default function QuestionSetsPage() {
   return (
     <div className="space-y-6 max-w-6xl">
       {/* Header */}
-      <div className="flex items-center justify-between">
-        <h1 className="text-xl font-bold">質問セット</h1>
-        <Link
-          href="/dashboard/question-sets/new"
-          className="inline-flex items-center gap-1.5 rounded-lg bg-accent px-4 py-2 text-sm font-medium text-white hover:bg-accent/90 transition-colors"
-        >
-          <Plus className="h-4 w-4" />
-          新規作成
-        </Link>
-      </div>
+      <h1 className="text-xl font-bold">質問セット</h1>
 
       {/* Card Grid */}
       {loading ? (
         <LoadingScreen />
-      ) : questionSets.length === 0 ? (
-        <p className="text-sm text-text-muted">質問セットがまだ作成されていません。「新規作成」から始めてください。</p>
       ) : (
         <div className="grid grid-cols-2 gap-4">
           {questionSets.map((qs) => (
             <Link
               key={qs.id}
               href={`/dashboard/question-sets/${qs.id}`}
-              className="group rounded-lg border border-border bg-surface p-5 hover:border-accent/30 hover:shadow-sm transition"
+              className="group rounded-2xl border border-border bg-surface p-5 hover:border-accent/30 hover:shadow-md hover:shadow-accent/5 transition"
             >
               <div className="flex items-start gap-3">
                 <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-accent-light">
@@ -72,6 +61,12 @@ export default function QuestionSetsPage() {
               </div>
             </Link>
           ))}
+          <Link
+            href="/dashboard/question-sets/new"
+            className="flex items-center justify-center rounded-2xl border border-dashed border-border bg-surface p-5 hover:border-accent/30 hover:shadow-md hover:shadow-accent/5 transition"
+          >
+            <Plus className="h-8 w-8 text-text-muted" />
+          </Link>
         </div>
       )}
     </div>

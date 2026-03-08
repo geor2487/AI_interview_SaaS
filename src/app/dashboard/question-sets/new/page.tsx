@@ -128,7 +128,7 @@ export default function NewQuestionSetPage() {
       <div className="grid grid-cols-5 gap-6">
         {/* Left: Settings */}
         <div className="col-span-2 space-y-4">
-          <div className="rounded-lg border border-border bg-surface p-5 space-y-4 sticky top-6">
+          <div className="rounded-2xl border border-border bg-surface p-5 space-y-4 sticky top-6">
             <h2 className="text-sm font-semibold">基本設定</h2>
             <div className="space-y-3">
               <div>
@@ -211,7 +211,7 @@ export default function NewQuestionSetPage() {
             </div>
           ) : (
             questions.map((q, i) => (
-              <div key={q.id} className="rounded-lg border border-border bg-surface p-4 group hover:border-accent/30 transition">
+              <div key={q.id} className="rounded-2xl border border-border bg-surface p-4 group hover:border-accent/30 transition">
                 <div className="flex items-start gap-3">
                   <div className="flex items-center gap-1 pt-0.5">
                     <GripVertical className="h-4 w-4 text-text-muted" />

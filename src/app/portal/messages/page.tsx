@@ -23,10 +23,7 @@ export default function MessagesPage() {
   const [inputValue, setInputValue] = useState("");
 
   useEffect(() => {
-    if (!user) {
-      setLoading(false);
-      return;
-    }
+    if (!user) return;
     const supabase = createClient();
     supabase
       .from("messages")

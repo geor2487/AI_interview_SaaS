@@ -20,34 +20,23 @@ function replaceVars(template: string, vars: TemplateVars): string {
 }
 
 export function invitationEmail(vars: TemplateVars) {
-  const subject = replaceVars("【{{company_name}}】AI面接のご案内", vars);
+  const subject = replaceVars("【{{company_name}}】面接のご案内 — アカウント登録のお願い", vars);
   const body = replaceVars(
     `{{candidate_name}} 様
 
 この度は{{company_name}}にご応募いただき、誠にありがとうございます。
 
-書類選考の結果、ぜひ面接にお進みいただきたくご連絡いたしました。
-下記のリンクよりアカウントを作成し、AI面接を受験してください。
+選考を進めるにあたり、下記リンクよりアカウントを作成してください。
+アカウント作成後、プロフィール・経歴をご登録いただきます。
+面接の日程は、マイページのメッセージにてご案内いたします。
 
-■ 面接リンク
+■ アカウント作成リンク
 {{interview_url}}
 
-■ 回答期限
-{{deadline_date}}
-
-■ 所要時間
-約{{duration}}分
-
-■ 受験の流れ
+■ 登録の流れ
 1. 上記リンクからアカウントを作成
-2. プロフィールを登録
-3. マイページから「面接を開始」をクリック
-
-■ 注意事項
-・回答期限までに必ず受験を完了してください
-・静かな環境でご参加ください
-・カメラとマイクの使用を許可してください
-・安定したインターネット接続をご確認ください
+2. プロフィール・経歴を入力
+3. マイページで面接のご案内をお待ちください
 
 ご不明な点がございましたら、お気軽にお問い合わせください。
 
