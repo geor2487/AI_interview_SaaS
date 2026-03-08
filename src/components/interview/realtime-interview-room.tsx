@@ -48,18 +48,48 @@ export function RealtimeInterviewRoom({
     }
     const blob = new Blob(chunksRef.current, { type: 'video/webm' })
     console.log('[Recording] blob size:', blob.size, 'bytes')
-    const formData = new FormData()
-    formData.append('video', blob, `interview-${interviewId}.webm`)
-    formData.append('interview_id', interviewId)
 
     try {
-      const res = await fetch('/api/recordings/upload', { method: 'POST', body: formData })
-      if (!res.ok) {
-        const data = await res.json().catch(() => ({}))
-        console.error('[Recording] Upload failed:', res.status, data)
-      } else {
-        console.log('[Recording] Upload success')
+      // Step 1: Get signed upload URL from our API
+      const prepareRes = await fetch('/api/recordings/prepare', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ interview_id: interviewId }),
+      })
+      if (!prepareRes.ok) {
+        const data = await prepareRes.json().catch(() => ({}))
+        console.error('[Recording] Prepare failed:', prepareRes.status, data)
+        return
       }
+      const { signed_url, token, storage_path } = await prepareRes.json()
+
+      // Step 2: Upload directly to Supabase Storage (bypasses Vercel 4.5MB limit)
+      const uploadRes = await fetch(signed_url, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'video/webm',
+          ...(token ? { 'x-upsert': 'false' } : {}),
+        },
+        body: blob,
+      })
+      if (!uploadRes.ok) {
+        console.error('[Recording] Direct upload failed:', uploadRes.status)
+        return
+      }
+      console.log('[Recording] Direct upload success')
+
+      // Step 3: Create DB record
+      const confirmRes = await fetch('/api/recordings/confirm', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ interview_id: interviewId, storage_path }),
+      })
+      if (!confirmRes.ok) {
+        const data = await confirmRes.json().catch(() => ({}))
+        console.error('[Recording] Confirm failed:', confirmRes.status, data)
+        return
+      }
+      console.log('[Recording] Upload complete')
     } catch (err) {
       console.error('[Recording] Upload failed:', err)
     }
