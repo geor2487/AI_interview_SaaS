@@ -285,7 +285,7 @@ export function useRealtimeInterview(): UseRealtimeInterviewReturn {
       // Save transcripts
       const currentTranscripts = transcriptsRef.current
       if (currentTranscripts.length > 0) {
-        await fetch('/api/interview/realtime/save-transcripts', {
+        const saveRes = await fetch('/api/interview/realtime/save-transcripts', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
@@ -293,6 +293,10 @@ export function useRealtimeInterview(): UseRealtimeInterviewReturn {
             transcripts: currentTranscripts,
           }),
         })
+        if (!saveRes.ok) {
+          const data = await saveRes.json()
+          throw new Error(data.error || 'Failed to save transcripts')
+        }
       }
 
       // Trigger evaluation

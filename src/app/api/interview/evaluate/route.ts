@@ -1,6 +1,5 @@
 import { NextResponse } from 'next/server'
-import { createServerClient } from '@supabase/ssr'
-import { cookies } from 'next/headers'
+import { createClient } from '@supabase/supabase-js'
 import { evaluateInterview } from '@/lib/openai/evaluate'
 import { sendEmail } from '@/lib/email/client'
 import { completionEmail } from '@/lib/email/templates'
@@ -17,22 +16,10 @@ export async function POST(request: Request) {
       )
     }
 
-    const cookieStore = await cookies()
-    const supabase = createServerClient(
+    // Use admin client to bypass RLS (candidates are not org members)
+    const supabase = createClient(
       process.env.NEXT_PUBLIC_SUPABASE_URL!,
-      process.env.SUPABASE_SERVICE_ROLE_KEY!,
-      {
-        cookies: {
-          getAll() {
-            return cookieStore.getAll()
-          },
-          setAll(c) {
-            c.forEach(({ name, value, options }) =>
-              cookieStore.set(name, value, options)
-            )
-          },
-        },
-      }
+      process.env.SUPABASE_SERVICE_ROLE_KEY!
     )
 
     // Fetch all transcripts
