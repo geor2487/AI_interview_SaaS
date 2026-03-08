@@ -1,8 +1,8 @@
 'use client'
 
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect, useRef, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
-import { Bot, Mic, MicOff, PhoneOff, Loader2 } from 'lucide-react'
+import { Bot, Mic, MicOff, PhoneOff, Loader2, Video, VideoOff } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { useRealtimeInterview } from '@/hooks/use-realtime-interview'
 import type { Question } from '@/types/index'
@@ -29,10 +29,15 @@ export function RealtimeInterviewRoom({
   } = useRealtimeInterview()
 
   const [micMuted, setMicMuted] = useState(false)
+  const [cameraOn, setCameraOn] = useState(true)
   const [elapsed, setElapsed] = useState(0)
   const [barHeights, setBarHeights] = useState([40, 60, 80, 50, 35])
   const transcriptEndRef = useRef<HTMLDivElement>(null)
   const startedRef = useRef(false)
+  const videoRef = useRef<HTMLVideoElement>(null)
+  const mediaStreamRef = useRef<MediaStream | null>(null)
+  const mediaRecorderRef = useRef<MediaRecorder | null>(null)
+  const chunksRef = useRef<Blob[]>([])
 
   // Auto-start interview
   useEffect(() => {
@@ -40,6 +45,76 @@ export function RealtimeInterviewRoom({
     startedRef.current = true
     startInterview(interviewId)
   }, [interviewId, startInterview])
+
+  // Camera + Recording
+  useEffect(() => {
+    async function initCamera() {
+      try {
+        const stream = await navigator.mediaDevices.getUserMedia({ video: true, audio: false })
+        mediaStreamRef.current = stream
+        if (videoRef.current) {
+          videoRef.current.srcObject = stream
+        }
+      } catch {
+        setCameraOn(false)
+      }
+    }
+    initCamera()
+    return () => {
+      mediaStreamRef.current?.getTracks().forEach((t) => t.stop())
+    }
+  }, [])
+
+  // Start recording when connected
+  useEffect(() => {
+    if (status !== 'connected' || !mediaStreamRef.current) return
+
+    try {
+      const recorder = new MediaRecorder(mediaStreamRef.current, {
+        mimeType: MediaRecorder.isTypeSupported('video/webm;codecs=vp9')
+          ? 'video/webm;codecs=vp9'
+          : 'video/webm',
+      })
+      chunksRef.current = []
+      recorder.ondataavailable = (e) => {
+        if (e.data.size > 0) chunksRef.current.push(e.data)
+      }
+      recorder.start(1000)
+      mediaRecorderRef.current = recorder
+    } catch {
+      // recording not supported
+    }
+  }, [status])
+
+  const uploadRecording = useCallback(async () => {
+    if (mediaRecorderRef.current && mediaRecorderRef.current.state !== 'inactive') {
+      mediaRecorderRef.current.stop()
+    }
+    // Wait for final chunks
+    await new Promise((r) => setTimeout(r, 500))
+
+    if (chunksRef.current.length === 0) return
+    const blob = new Blob(chunksRef.current, { type: 'video/webm' })
+    const formData = new FormData()
+    formData.append('video', blob, `interview-${interviewId}.webm`)
+    formData.append('interview_id', interviewId)
+
+    try {
+      await fetch('/api/recordings/upload', { method: 'POST', body: formData })
+    } catch (err) {
+      console.error('Recording upload failed:', err)
+    }
+  }, [interviewId])
+
+  const handleCameraToggle = () => {
+    if (mediaStreamRef.current) {
+      const videoTrack = mediaStreamRef.current.getVideoTracks()[0]
+      if (videoTrack) {
+        videoTrack.enabled = !videoTrack.enabled
+        setCameraOn(videoTrack.enabled)
+      }
+    }
+  }
 
   // Timer
   useEffect(() => {
@@ -87,6 +162,8 @@ export function RealtimeInterviewRoom({
   }
 
   const handleEndInterview = async () => {
+    uploadRecording()
+    mediaStreamRef.current?.getTracks().forEach((t) => t.stop())
     await endInterview()
   }
 
@@ -212,7 +289,29 @@ export function RealtimeInterviewRoom({
       {/* Main Area */}
       <main className="flex-1 flex items-stretch p-6 gap-6 overflow-hidden">
         {/* Left: AI Section */}
-        <div className="flex-[3] flex flex-col items-center justify-center gap-6 max-w-2xl mx-auto">
+        <div className="flex-[3] flex flex-col items-center justify-center gap-6 max-w-2xl mx-auto relative">
+          {/* Camera Preview (small, bottom-right) */}
+          <div className="absolute bottom-4 right-4 z-10">
+            <div
+              className="w-40 h-30 rounded-lg overflow-hidden border-2 border-zinc-700 shadow-lg"
+              style={{ background: '#18181b' }}
+            >
+              {cameraOn ? (
+                <video
+                  ref={videoRef}
+                  autoPlay
+                  muted
+                  playsInline
+                  className="w-full h-full object-cover"
+                  style={{ transform: 'scaleX(-1)' }}
+                />
+              ) : (
+                <div className="w-full h-full flex items-center justify-center">
+                  <VideoOff className="h-5 w-5 text-zinc-500" />
+                </div>
+              )}
+            </div>
+          </div>
           {/* AI Avatar */}
           <div className="relative">
             <div
@@ -342,7 +441,25 @@ export function RealtimeInterviewRoom({
         className="flex items-center justify-center gap-4 px-6 h-20 shrink-0"
         style={{ borderTop: '1px solid #27272a' }}
       >
-        {/* Mic Toggle (visual only - see note in handler) */}
+        {/* Camera Toggle */}
+        <button
+          onClick={handleCameraToggle}
+          className={cn(
+            'h-12 w-12 rounded-full flex items-center justify-center transition-all',
+            cameraOn
+              ? 'bg-[#27272a] hover:bg-[#3f3f46] text-white'
+              : 'bg-red-500/20 hover:bg-red-500/30 text-red-400'
+          )}
+          title={cameraOn ? 'カメラOFF' : 'カメラON'}
+        >
+          {cameraOn ? (
+            <Video className="h-5 w-5" />
+          ) : (
+            <VideoOff className="h-5 w-5" />
+          )}
+        </button>
+
+        {/* Mic Toggle */}
         <button
           onClick={handleMicToggle}
           className={cn(

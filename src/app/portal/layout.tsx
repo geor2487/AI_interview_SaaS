@@ -2,8 +2,9 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Video, User, Bell } from "lucide-react";
+import { Video, Bell } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { useAuth } from "@/components/providers/auth-provider";
 
 const navItems = [
   { label: "マイページ", href: "/portal" },
@@ -17,6 +18,8 @@ export default function PortalLayout({
   children: React.ReactNode;
 }) {
   const pathname = usePathname();
+  const { user } = useAuth();
+  const fullName = user?.user_metadata?.full_name ?? "ユーザー";
 
   return (
     <div className="min-h-screen bg-background">
@@ -59,13 +62,12 @@ export default function PortalLayout({
           <div className="flex items-center gap-3">
             <button className="relative h-8 w-8 flex items-center justify-center rounded-lg hover:bg-accent-light/50 transition-colors text-text-sub hover:text-foreground">
               <Bell className="h-4 w-4" />
-              <span className="absolute top-1 right-1 h-2 w-2 rounded-full bg-red" />
             </button>
             <div className="flex items-center gap-2.5">
               <div className="h-8 w-8 rounded-full bg-gradient-to-br from-accent to-purple-500 flex items-center justify-center text-[11px] font-bold text-white">
-                田
+                {fullName[0]}
               </div>
-              <span className="text-[13px] font-medium text-foreground hidden sm:block">田中 花子</span>
+              <span className="text-[13px] font-medium text-foreground hidden sm:block">{fullName}</span>
             </div>
           </div>
         </div>

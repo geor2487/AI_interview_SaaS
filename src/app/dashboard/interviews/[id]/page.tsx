@@ -1,10 +1,11 @@
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
-import { ArrowLeft, Download, MessageCircle, BarChart3, Pencil, Play, Printer } from "lucide-react";
+import { ArrowLeft, Download, MessageCircle, BarChart3, Pencil, Play, Printer, VideoOff } from "lucide-react";
 import Link from "next/link";
 import { useParams } from "next/navigation";
 import { cn } from "@/lib/utils";
+import { createClient } from "@/lib/supabase/client";
 import { EvaluationSummary } from "@/components/interview/evaluation-summary";
 import { ManualEvaluation } from "@/components/interview/manual-evaluation";
 import { PrintReport, type PrintReportProps } from "@/components/interview/print-report";
@@ -38,13 +39,6 @@ interface ReportData {
   overallScore: number;
 }
 
-// Fallback mock data for when API is not available
-const mockTranscript = [
-  { speaker: "ai" as const, content: "本日はお時間をいただきありがとうございます。それでは面接を始めさせていただきます。まず、Reactのコンポーネントライフサイクルについて説明していただけますか？" },
-  { speaker: "candidate" as const, content: "はい。Reactのコンポーネントライフサイクルには、マウント・更新・アンマウントの3つのフェーズがあります。クラスコンポーネントではcomponentDidMountやcomponentWillUnmountなどのメソッドがありますが、現在はuseEffectフックで統一的に管理できます。" },
-  { speaker: "ai" as const, content: "ありがとうございます。次に、TypeScriptのジェネリクスについてお聞かせください。実務でどのように活用されていますか？" },
-  { speaker: "candidate" as const, content: "実務では主にAPIレスポンスの型定義やカスタムフックの汎用化に使っています。型推論も活用して、呼び出し側での型指定を最小限にしています。" },
-];
 
 function scoreBg(score: number) {
   if (score >= 85) return "bg-green-bg text-green";
@@ -60,6 +54,8 @@ export default function InterviewDetailPage() {
   const [reportData, setReportData] = useState<ReportData | null>(null);
   const [loading, setLoading] = useState(true);
   const [pdfDownloading, setPdfDownloading] = useState(false);
+  const [recordingUrl, setRecordingUrl] = useState<string | null>(null);
+  const [recordingLoading, setRecordingLoading] = useState(false);
 
   useEffect(() => {
     async function fetchData() {
@@ -70,12 +66,38 @@ export default function InterviewDetailPage() {
           setReportData(data);
         }
       } catch {
-        // Fallback to mock data if API not available
+        // ignore
       } finally {
         setLoading(false);
       }
     }
     fetchData();
+  }, [interviewId]);
+
+  // Fetch recording URL
+  useEffect(() => {
+    async function fetchRecording() {
+      setRecordingLoading(true);
+      const supabase = createClient();
+      const { data: recording } = await supabase
+        .from("recordings")
+        .select("storage_path")
+        .eq("interview_id", interviewId)
+        .order("created_at", { ascending: false })
+        .limit(1)
+        .single();
+
+      if (recording?.storage_path) {
+        const { data: urlData } = await supabase.storage
+          .from("recordings")
+          .createSignedUrl(recording.storage_path, 3600);
+        if (urlData?.signedUrl) {
+          setRecordingUrl(urlData.signedUrl);
+        }
+      }
+      setRecordingLoading(false);
+    }
+    fetchRecording();
   }, [interviewId]);
 
   const handlePDFDownload = useCallback(async () => {
@@ -89,24 +111,15 @@ export default function InterviewDetailPage() {
     }
   }, [interviewId]);
 
-  const candidateName = reportData?.candidate?.name ?? "佐藤 花子";
+  const candidateName = reportData?.candidate?.name ?? "不明";
   const candidateInitial = candidateName.charAt(0);
-  const position = reportData?.candidate?.desired_position ?? "フロントエンドエンジニア";
+  const position = reportData?.candidate?.desired_position ?? "";
   const interviewDate = reportData?.interview?.started_at
     ? new Date(reportData.interview.started_at).toLocaleString("ja-JP")
-    : "2026-03-07 10:00";
+    : "-";
   const overallScore = reportData?.overallScore ?? 0;
 
-  const transcripts = reportData?.transcripts ?? [];
-  const displayTranscripts = transcripts.length > 0 ? transcripts : mockTranscript.map((t, i) => ({
-    id: `mock-${i}`,
-    interview_id: interviewId,
-    question_id: null,
-    speaker: t.speaker,
-    content: t.content,
-    timestamp_ms: i * 30000,
-    created_at: new Date().toISOString(),
-  }));
+  const displayTranscripts = reportData?.transcripts ?? [];
 
   const evaluations = reportData?.evaluations ?? [];
   const questions = reportData?.questions ?? [];
@@ -212,7 +225,7 @@ export default function InterviewDetailPage() {
         <div className="col-span-2">
           {loading && (
             <div className="rounded-lg border border-border bg-surface p-5">
-              <p className="text-sm text-text-muted animate-pulse">データを読み込み中...</p>
+              <p className="text-sm text-text-muted">面接データがありません</p>
             </div>
           )}
 
@@ -255,9 +268,23 @@ export default function InterviewDetailPage() {
 
           {!loading && activeTab === "recording" && (
             <div className="rounded-lg border border-border bg-surface p-5">
-              <div className="flex h-48 items-center justify-center rounded-lg border border-dashed border-border-sub text-sm text-text-muted">
-                録画プレイヤー
-              </div>
+              {recordingLoading ? (
+                <div className="flex h-48 items-center justify-center text-sm text-text-muted">
+                  録画データを確認中...
+                </div>
+              ) : recordingUrl ? (
+                <video
+                  src={recordingUrl}
+                  controls
+                  className="w-full rounded-lg bg-black"
+                  style={{ maxHeight: "480px" }}
+                />
+              ) : (
+                <div className="flex h-48 flex-col items-center justify-center gap-2 rounded-lg border border-dashed border-border-sub text-text-muted">
+                  <VideoOff className="h-8 w-8" />
+                  <p className="text-sm">録画データがありません</p>
+                </div>
+              )}
             </div>
           )}
         </div>

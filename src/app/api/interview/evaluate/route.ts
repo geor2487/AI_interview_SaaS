@@ -2,6 +2,8 @@ import { NextResponse } from 'next/server'
 import { createServerClient } from '@supabase/ssr'
 import { cookies } from 'next/headers'
 import { evaluateInterview } from '@/lib/openai/evaluate'
+import { sendEmail } from '@/lib/email/client'
+import { completionEmail } from '@/lib/email/templates'
 import type { Transcript, Question } from '@/types/index'
 
 export async function POST(request: Request) {
@@ -102,6 +104,32 @@ export async function POST(request: Request) {
       .from('interviews')
       .update({ status: 'evaluated' })
       .eq('id', interview_id)
+
+    // Send completion email to candidate
+    try {
+      const { data: interview } = await supabase
+        .from('interviews')
+        .select('candidate_id, organization_id')
+        .eq('id', interview_id)
+        .single()
+
+      if (interview) {
+        const [{ data: candidate }, { data: org }] = await Promise.all([
+          supabase.from('candidates').select('name, email').eq('id', interview.candidate_id).single(),
+          supabase.from('organizations').select('name').eq('id', interview.organization_id).single(),
+        ])
+
+        if (candidate?.email) {
+          const { subject, body: emailBody } = completionEmail({
+            candidate_name: candidate.name,
+            company_name: org?.name ?? '企業',
+          })
+          await sendEmail({ to: candidate.email, subject, text: emailBody })
+        }
+      }
+    } catch (emailErr) {
+      console.error('[Evaluate] Completion email failed:', emailErr)
+    }
 
     return NextResponse.json({
       evaluations: {

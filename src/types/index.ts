@@ -7,6 +7,9 @@ export type SenderType = "admin" | "interviewer" | "candidate" | "system";
 export interface Organization {
   id: string;
   name: string;
+  address: string | null;
+  phone: string | null;
+  website: string | null;
   created_at: string;
 }
 

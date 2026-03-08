@@ -10,6 +10,7 @@ import {
   Settings,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { useAuth } from "@/components/providers/auth-provider";
 
 const navItems = [
   { label: "概要", href: "/dashboard", icon: LayoutDashboard, match: /^\/dashboard$/ },
@@ -21,6 +22,10 @@ const navItems = [
 
 export function Sidebar() {
   const pathname = usePathname();
+  const { user, member } = useAuth();
+  const fullName = user?.user_metadata?.full_name ?? "ユーザー";
+  const orgName = member?.organizations?.name ?? "";
+  const role = member?.role === "admin" ? "管理者" : "面接官";
 
   return (
     <aside className="flex flex-col w-[210px] min-h-screen shrink-0 border-r border-border bg-surface">
@@ -32,7 +37,7 @@ export function Sidebar() {
           </div>
           <span className="text-[15px] font-bold tracking-tight">InterviewAI</span>
         </div>
-        <p className="mt-2 text-xs text-text-muted">Acme Corp.</p>
+        <p className="mt-2 text-xs text-text-muted">{orgName}</p>
       </div>
 
       {/* Navigation */}
@@ -62,11 +67,11 @@ export function Sidebar() {
       <div className="border-t border-border px-4 py-4">
         <div className="flex items-center gap-2.5">
           <div className="flex h-8 w-8 items-center justify-center rounded-full bg-gradient-to-br from-accent to-purple-500 text-[11px] font-bold text-white">
-            山
+            {fullName[0]}
           </div>
           <div className="min-w-0">
-            <p className="truncate text-[13px] font-medium">山田 太郎</p>
-            <p className="truncate text-[11px] text-text-muted">管理者</p>
+            <p className="truncate text-[13px] font-medium">{fullName}</p>
+            <p className="truncate text-[11px] text-text-muted">{role}</p>
           </div>
         </div>
       </div>

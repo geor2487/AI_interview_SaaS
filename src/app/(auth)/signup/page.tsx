@@ -9,6 +9,8 @@ import { cn } from "@/lib/utils";
 export default function SignupPage() {
   const router = useRouter();
   const [orgName, setOrgName] = useState("");
+  const [address, setAddress] = useState("");
+  const [phone, setPhone] = useState("");
   const [fullName, setFullName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -21,58 +23,34 @@ export default function SignupPage() {
     setLoading(true);
 
     try {
-      const supabase = createClient();
-
-      // 1. Sign up the user
-      const { data: authData, error: authError } = await supabase.auth.signUp({
-        email,
-        password,
-        options: {
-          data: {
-            full_name: fullName,
-          },
-        },
+      // 1. Create user, org, and member via server API (bypasses RLS)
+      const res = await fetch("/api/auth/signup", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email, password, fullName, orgName, address, phone }),
       });
 
-      if (authError) {
-        setError(authError.message);
+      const data = await res.json();
+      if (!res.ok) {
+        setError(data.error);
         return;
       }
 
-      if (!authData.user) {
-        setError("ユーザーの作成に失敗しました。");
-        return;
-      }
+      // 2. Sign in to establish session
+      const supabase = createClient();
+      const { error: signInError } = await supabase.auth.signInWithPassword({
+        email,
+        password,
+      });
 
-      // 2. Create organization
-      const { data: org, error: orgError } = await supabase
-        .from("organizations")
-        .insert({ name: orgName })
-        .select("id")
-        .single();
-
-      if (orgError) {
-        setError("組織の作成に失敗しました: " + orgError.message);
-        return;
-      }
-
-      // 3. Create member record
-      const { error: memberError } = await supabase
-        .from("members")
-        .insert({
-          organization_id: org.id,
-          user_id: authData.user.id,
-          role: "admin",
-        });
-
-      if (memberError) {
-        setError("メンバー登録に失敗しました: " + memberError.message);
+      if (signInError) {
+        setError(signInError.message);
         return;
       }
 
       router.push("/dashboard");
-    } catch {
-      setError("登録中にエラーが発生しました。");
+    } catch (err) {
+      setError("登録中にエラーが発生しました: " + (err instanceof Error ? err.message : String(err)));
     } finally {
       setLoading(false);
     }
@@ -128,6 +106,40 @@ export default function SignupPage() {
               value={orgName}
               onChange={(e) => setOrgName(e.target.value)}
               placeholder="株式会社サンプル"
+              className={inputClass}
+            />
+          </div>
+
+          <div>
+            <label
+              htmlFor="address"
+              className="block text-sm font-medium text-foreground mb-1.5"
+            >
+              住所
+            </label>
+            <input
+              id="address"
+              type="text"
+              value={address}
+              onChange={(e) => setAddress(e.target.value)}
+              placeholder="東京都渋谷区..."
+              className={inputClass}
+            />
+          </div>
+
+          <div>
+            <label
+              htmlFor="phone"
+              className="block text-sm font-medium text-foreground mb-1.5"
+            >
+              電話番号
+            </label>
+            <input
+              id="phone"
+              type="tel"
+              value={phone}
+              onChange={(e) => setPhone(e.target.value)}
+              placeholder="03-1234-5678"
               className={inputClass}
             />
           </div>

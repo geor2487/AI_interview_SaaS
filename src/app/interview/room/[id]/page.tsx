@@ -36,7 +36,7 @@ function LegacyInterviewRoom() {
   const router = useRouter();
   const [micOn, setMicOn] = useState(true);
   const [camOn, setCamOn] = useState(true);
-  const [elapsed, setElapsed] = useState(754); // 12:34 in seconds
+  const [elapsed, setElapsed] = useState(0);
   const [barHeights, setBarHeights] = useState([40, 60, 80, 50, 35]);
 
   // Animate audio bars
@@ -175,7 +175,7 @@ function LegacyInterviewRoom() {
               className="absolute bottom-3 left-3 rounded-full px-3 py-1"
               style={{ background: "rgba(0,0,0,0.6)", backdropFilter: "blur(8px)" }}
             >
-              <span className="text-xs font-medium text-white/80">田中 花子</span>
+              <span className="text-xs font-medium text-white/80">候補者</span>
             </div>
           </div>
         </div>

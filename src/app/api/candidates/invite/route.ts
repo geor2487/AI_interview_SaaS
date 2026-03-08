@@ -1,6 +1,8 @@
 import { createServerClient } from "@supabase/ssr";
 import { cookies } from "next/headers";
 import { NextRequest, NextResponse } from "next/server";
+import { sendEmail } from "@/lib/email/client";
+import { invitationEmail } from "@/lib/email/templates";
 
 export async function POST(request: NextRequest) {
   const cookieStore = await cookies();
@@ -41,6 +43,20 @@ export async function POST(request: NextRequest) {
     );
   }
 
+  // Fetch candidate info
+  const { data: candidate, error: candidateError } = await supabase
+    .from("candidates")
+    .select("id, name, email, organization_id")
+    .eq("id", candidate_id)
+    .single();
+
+  if (candidateError || !candidate) {
+    return NextResponse.json(
+      { error: "Candidate not found" },
+      { status: 404 }
+    );
+  }
+
   // Fetch candidate's interview to get the invite_token
   const { data: interview, error: interviewError } = await supabase
     .from("interviews")
@@ -57,13 +73,36 @@ export async function POST(request: NextRequest) {
     );
   }
 
+  // Fetch organization name
+  const { data: org } = await supabase
+    .from("organizations")
+    .select("name")
+    .eq("id", candidate.organization_id)
+    .single();
+
   const baseUrl = process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000";
   const inviteUrl = `${baseUrl}/interview/${interview.invite_token}`;
 
   if (method === "email") {
-    // Placeholder: log for now, actual email integration via Supabase Edge Functions or Resend
-    console.log(`[Invite Email] Sending invite to candidate ${candidate_id}`);
-    console.log(`[Invite Email] Interview URL: ${inviteUrl}`);
+    const { subject, body: emailBody } = invitationEmail({
+      candidate_name: candidate.name,
+      company_name: org?.name ?? "企業",
+      interview_url: inviteUrl,
+    });
+
+    try {
+      await sendEmail({
+        to: candidate.email,
+        subject,
+        text: emailBody,
+      });
+    } catch (err) {
+      console.error("[Invite] Email send failed:", err);
+      return NextResponse.json(
+        { error: "メール送信に失敗しました" },
+        { status: 500 }
+      );
+    }
 
     // Update candidate status to invited
     await supabase
@@ -73,7 +112,7 @@ export async function POST(request: NextRequest) {
 
     return NextResponse.json({
       success: true,
-      message: "Invite email sent (placeholder)",
+      message: "招待メールを送信しました",
       invite_url: inviteUrl,
     });
   }

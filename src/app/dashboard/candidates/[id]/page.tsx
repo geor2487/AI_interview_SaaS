@@ -1,57 +1,64 @@
 "use client";
 
+import { useEffect, useState } from "react";
 import { ArrowLeft, FileText, Mail, MapPin, Phone, User } from "lucide-react";
 import Link from "next/link";
+import { useParams } from "next/navigation";
 import { cn } from "@/lib/utils";
-
-const candidate = {
-  name: "佐藤 花子",
-  email: "hanako@example.com",
-  phone: "090-1234-5678",
-  location: "東京都渋谷区",
-  age: 28,
-  position: "フロントエンドエンジニア",
-};
-
-const education = [
-  { institution: "東京大学", department: "工学部 情報工学科", period: "2016年4月 - 2020年3月" },
-  { institution: "東京大学大学院", department: "情報理工学系研究科", period: "2020年4月 - 2022年3月" },
-];
-
-const career = [
-  { company: "株式会社テックコープ", title: "フロントエンドエンジニア", period: "2022年4月 - 現在", description: "React/Next.jsを用いたWebアプリ開発" },
-  { company: "株式会社スタートアップX", title: "インターン", period: "2021年6月 - 2022年3月", description: "Vue.jsでの管理画面開発" },
-];
-
-const skills = [
-  { name: "React", level: 90 },
-  { name: "TypeScript", level: 85 },
-  { name: "Next.js", level: 80 },
-  { name: "CSS/Tailwind", level: 75 },
-  { name: "Node.js", level: 60 },
-];
-
-const interviews = [
-  { date: "2026-03-07", title: "フロントエンド基礎", status: "completed", score: 85 },
-  { date: "2026-03-01", title: "コーディングテスト", status: "evaluated", score: 90 },
-];
-
-const documents = [
-  { name: "履歴書.pdf", size: "245 KB" },
-  { name: "職務経歴書.pdf", size: "312 KB" },
-  { name: "ポートフォリオ.pdf", size: "1.2 MB" },
-];
+import { createClient } from "@/lib/supabase/client";
+import type { Candidate, CandidateCareer, CandidateEducation, CandidateSkill, CandidateDocument } from "@/types";
 
 const statusBadge: Record<string, { label: string; className: string }> = {
   completed: { label: "完了", className: "bg-green-bg text-green" },
   evaluated: { label: "評価済", className: "bg-accent-light text-accent" },
   scheduled: { label: "予定", className: "bg-yellow-bg text-yellow" },
+  pending: { label: "予定", className: "bg-yellow-bg text-yellow" },
+  in_progress: { label: "進行中", className: "bg-accent-light text-accent-text" },
 };
 
+interface InterviewRow {
+  id: string;
+  status: string;
+  created_at: string;
+}
+
 export default function CandidateDetailPage() {
+  const params = useParams();
+  const candidateId = params.id as string;
+
+  const [candidate, setCandidate] = useState<Candidate | null>(null);
+  const [education, setEducation] = useState<CandidateEducation[]>([]);
+  const [careers, setCareers] = useState<CandidateCareer[]>([]);
+  const [skills, setSkills] = useState<CandidateSkill[]>([]);
+  const [documents, setDocuments] = useState<CandidateDocument[]>([]);
+  const [interviews, setInterviews] = useState<InterviewRow[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    const supabase = createClient();
+    Promise.all([
+      supabase.from("candidates").select("*").eq("id", candidateId).single(),
+      supabase.from("candidate_educations").select("*").eq("candidate_id", candidateId).order("order_index"),
+      supabase.from("candidate_careers").select("*").eq("candidate_id", candidateId).order("order_index"),
+      supabase.from("candidate_skills").select("*").eq("candidate_id", candidateId),
+      supabase.from("candidate_documents").select("*").eq("candidate_id", candidateId),
+      supabase.from("interviews").select("id, status, created_at").eq("candidate_id", candidateId).order("created_at", { ascending: false }),
+    ]).then(([candRes, eduRes, carRes, skillRes, docRes, ivRes]) => {
+      setCandidate(candRes.data);
+      setEducation(eduRes.data ?? []);
+      setCareers(carRes.data ?? []);
+      setSkills(skillRes.data ?? []);
+      setDocuments(docRes.data ?? []);
+      setInterviews(ivRes.data ?? []);
+      setLoading(false);
+    });
+  }, [candidateId]);
+
+  if (loading) return <p className="text-sm text-text-muted p-6">候補者データを取得できませんでした</p>;
+  if (!candidate) return <p className="text-sm text-text-muted p-6">候補者が見つかりません。</p>;
+
   return (
     <div className="space-y-6 max-w-6xl">
-      {/* Back */}
       <Link href="/dashboard/candidates" className="inline-flex items-center gap-1 text-sm text-text-muted hover:text-accent transition-colors">
         <ArrowLeft className="h-4 w-4" />
         候補者一覧に戻る
@@ -69,63 +76,76 @@ export default function CandidateDetailPage() {
               </div>
               <div className="flex-1 space-y-2">
                 <h3 className="text-lg font-bold">{candidate.name}</h3>
-                <p className="text-sm text-accent">{candidate.position}</p>
+                {candidate.desired_position && (
+                  <p className="text-sm text-accent">{candidate.desired_position}</p>
+                )}
                 <div className="grid grid-cols-2 gap-2 pt-2 text-sm text-text-sub">
                   <span className="flex items-center gap-1.5"><Mail className="h-3.5 w-3.5" />{candidate.email}</span>
-                  <span className="flex items-center gap-1.5"><Phone className="h-3.5 w-3.5" />{candidate.phone}</span>
-                  <span className="flex items-center gap-1.5"><MapPin className="h-3.5 w-3.5" />{candidate.location}</span>
-                  <span className="flex items-center gap-1.5"><User className="h-3.5 w-3.5" />{candidate.age}歳</span>
+                  {candidate.phone && <span className="flex items-center gap-1.5"><Phone className="h-3.5 w-3.5" />{candidate.phone}</span>}
+                  {candidate.location && <span className="flex items-center gap-1.5"><MapPin className="h-3.5 w-3.5" />{candidate.location}</span>}
                 </div>
               </div>
             </div>
           </div>
 
           {/* 学歴・職歴 */}
-          <div className="rounded-lg border border-border bg-surface p-5">
-            <h2 className="text-sm font-semibold mb-4">学歴・職歴</h2>
-            <div className="space-y-0">
-              <h3 className="text-xs font-medium text-text-muted mb-2">学歴</h3>
-              {education.map((e, i) => (
-                <div key={i} className="relative pl-5 pb-4 border-l-2 border-border-sub last:border-0">
-                  <div className="absolute -left-[5px] top-1 h-2 w-2 rounded-full bg-accent" />
-                  <p className="text-sm font-medium">{e.institution}</p>
-                  <p className="text-xs text-text-sub">{e.department}</p>
-                  <p className="text-xs text-text-muted">{e.period}</p>
-                </div>
-              ))}
-              <h3 className="text-xs font-medium text-text-muted mb-2 mt-3">職歴</h3>
-              {career.map((c, i) => (
-                <div key={i} className="relative pl-5 pb-4 border-l-2 border-border-sub last:border-0">
-                  <div className="absolute -left-[5px] top-1 h-2 w-2 rounded-full bg-accent" />
-                  <p className="text-sm font-medium">{c.company}</p>
-                  <p className="text-xs text-text-sub">{c.title}</p>
-                  <p className="text-xs text-text-muted">{c.period}</p>
-                  <p className="text-xs text-text-muted mt-0.5">{c.description}</p>
-                </div>
-              ))}
+          {(education.length > 0 || careers.length > 0) && (
+            <div className="rounded-lg border border-border bg-surface p-5">
+              <h2 className="text-sm font-semibold mb-4">学歴・職歴</h2>
+              <div className="space-y-0">
+                {education.length > 0 && (
+                  <>
+                    <h3 className="text-xs font-medium text-text-muted mb-2">学歴</h3>
+                    {education.map((e) => (
+                      <div key={e.id} className="relative pl-5 pb-4 border-l-2 border-border-sub last:border-0">
+                        <div className="absolute -left-[5px] top-1 h-2 w-2 rounded-full bg-accent" />
+                        <p className="text-sm font-medium">{e.institution}</p>
+                        <p className="text-xs text-text-sub">{e.department}</p>
+                        <p className="text-xs text-text-muted">{e.period_start} - {e.period_end ?? "現在"}</p>
+                      </div>
+                    ))}
+                  </>
+                )}
+                {careers.length > 0 && (
+                  <>
+                    <h3 className="text-xs font-medium text-text-muted mb-2 mt-3">職歴</h3>
+                    {careers.map((c) => (
+                      <div key={c.id} className="relative pl-5 pb-4 border-l-2 border-border-sub last:border-0">
+                        <div className="absolute -left-[5px] top-1 h-2 w-2 rounded-full bg-accent" />
+                        <p className="text-sm font-medium">{c.company}</p>
+                        <p className="text-xs text-text-sub">{c.title}</p>
+                        <p className="text-xs text-text-muted">{c.period_start} - {c.period_end ?? "現在"}</p>
+                        {c.description && <p className="text-xs text-text-muted mt-0.5">{c.description}</p>}
+                      </div>
+                    ))}
+                  </>
+                )}
+              </div>
             </div>
-          </div>
+          )}
 
           {/* スキル */}
-          <div className="rounded-lg border border-border bg-surface p-5">
-            <h2 className="text-sm font-semibold mb-4">スキル</h2>
-            <div className="space-y-3">
-              {skills.map((s) => (
-                <div key={s.name} className="space-y-1">
-                  <div className="flex items-center justify-between text-sm">
-                    <span className="font-medium">{s.name}</span>
-                    <span className="text-xs text-text-muted">{s.level}%</span>
+          {skills.length > 0 && (
+            <div className="rounded-lg border border-border bg-surface p-5">
+              <h2 className="text-sm font-semibold mb-4">スキル</h2>
+              <div className="space-y-3">
+                {skills.map((s) => (
+                  <div key={s.id} className="space-y-1">
+                    <div className="flex items-center justify-between text-sm">
+                      <span className="font-medium">{s.name}</span>
+                      <span className="text-xs text-text-muted">{s.level}%</span>
+                    </div>
+                    <div className="h-2 rounded-full bg-background">
+                      <div
+                        className="h-2 rounded-full bg-gradient-to-r from-accent to-purple-500"
+                        style={{ width: `${s.level}%` }}
+                      />
+                    </div>
                   </div>
-                  <div className="h-2 rounded-full bg-background">
-                    <div
-                      className="h-2 rounded-full bg-gradient-to-r from-accent to-purple-500"
-                      style={{ width: `${s.level}%` }}
-                    />
-                  </div>
-                </div>
-              ))}
+                ))}
+              </div>
             </div>
-          </div>
+          )}
         </div>
 
         {/* Right 40% */}
@@ -133,58 +153,47 @@ export default function CandidateDetailPage() {
           {/* 面接履歴 */}
           <div className="rounded-lg border border-border bg-surface p-5">
             <h2 className="text-sm font-semibold mb-4">面接履歴</h2>
-            <div className="space-y-3">
-              {interviews.map((iv, i) => {
-                const badge = statusBadge[iv.status];
-                return (
-                  <div key={i} className="flex items-center justify-between rounded-lg border border-border-sub p-3">
-                    <div>
-                      <p className="text-sm font-medium">{iv.title}</p>
-                      <p className="text-xs text-text-muted">{iv.date}</p>
-                    </div>
-                    <div className="flex items-center gap-2">
+            {interviews.length === 0 ? (
+              <p className="text-sm text-text-muted">面接履歴がありません。</p>
+            ) : (
+              <div className="space-y-3">
+                {interviews.map((iv) => {
+                  const badge = statusBadge[iv.status] ?? { label: iv.status, className: "bg-gray-100 text-gray-600" };
+                  return (
+                    <Link
+                      key={iv.id}
+                      href={`/dashboard/interviews/${iv.id}`}
+                      className="flex items-center justify-between rounded-lg border border-border-sub p-3 hover:bg-background transition-colors"
+                    >
+                      <p className="text-xs text-text-muted">{new Date(iv.created_at).toLocaleDateString("ja-JP")}</p>
                       <span className={cn("rounded-full px-2 py-0.5 text-xs font-medium", badge.className)}>
                         {badge.label}
                       </span>
-                      <span className="text-sm font-bold">{iv.score}点</span>
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-          </div>
-
-          {/* AI総合評価 */}
-          <div className="rounded-lg border border-border bg-surface p-5">
-            <h2 className="text-sm font-semibold mb-4">AI総合評価</h2>
-            <div className="flex items-center gap-4 mb-3">
-              <div className="flex h-16 w-16 items-center justify-center rounded-full bg-gradient-to-br from-accent to-purple-500 text-xl font-bold text-white">
-                87
+                    </Link>
+                  );
+                })}
               </div>
-              <div>
-                <p className="text-sm font-medium">総合スコア</p>
-                <span className="rounded-full bg-green-bg px-2.5 py-0.5 text-xs font-medium text-green">優秀</span>
-              </div>
-            </div>
-            <p className="text-sm text-text-sub leading-relaxed">
-              技術力・コミュニケーション能力ともに高い水準です。特にReactとTypeScriptに関する深い理解が見られ、実務経験に基づいた回答が印象的でした。チームワークへの意識も高く、即戦力として期待できます。
-            </p>
+            )}
           </div>
 
           {/* 提出書類 */}
           <div className="rounded-lg border border-border bg-surface p-5">
             <h2 className="text-sm font-semibold mb-4">提出書類</h2>
-            <div className="space-y-2">
-              {documents.map((d) => (
-                <div key={d.name} className="flex items-center gap-2.5 rounded-lg border border-border-sub p-3 hover:bg-background transition-colors cursor-pointer">
-                  <FileText className="h-4 w-4 text-accent" />
-                  <div className="flex-1 min-w-0">
-                    <p className="truncate text-sm font-medium">{d.name}</p>
-                    <p className="text-xs text-text-muted">{d.size}</p>
+            {documents.length === 0 ? (
+              <p className="text-sm text-text-muted">書類がありません。</p>
+            ) : (
+              <div className="space-y-2">
+                {documents.map((d) => (
+                  <div key={d.id} className="flex items-center gap-2.5 rounded-lg border border-border-sub p-3 hover:bg-background transition-colors cursor-pointer">
+                    <FileText className="h-4 w-4 text-accent" />
+                    <div className="flex-1 min-w-0">
+                      <p className="truncate text-sm font-medium">{d.name}</p>
+                      <p className="text-xs text-text-muted">{(d.size_bytes / 1024).toFixed(0)} KB</p>
+                    </div>
                   </div>
-                </div>
-              ))}
-            </div>
+                ))}
+              </div>
+            )}
           </div>
         </div>
       </div>

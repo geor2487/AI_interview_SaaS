@@ -1,28 +1,20 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import Link from "next/link";
 import { Eye, Plus } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { useOrganization } from "@/hooks/use-organization";
+import { createClient } from "@/lib/supabase/client";
 import type { InterviewStatus } from "@/types";
 
-interface MockInterview {
+interface InterviewRow {
   id: string;
-  candidateName: string;
-  candidateInitial: string;
-  questionSet: string;
   status: InterviewStatus;
-  score: number | null;
-  scheduledAt: string;
+  scheduled_at: string | null;
+  created_at: string;
+  candidate: { name: string } | null;
 }
-
-const interviews: MockInterview[] = [
-  { id: "1", candidateName: "佐藤 花子", candidateInitial: "佐", questionSet: "フロントエンド基礎", status: "completed", score: 85, scheduledAt: "2026-03-07 10:00" },
-  { id: "2", candidateName: "鈴木 一郎", candidateInitial: "鈴", questionSet: "バックエンド実務", status: "pending", score: null, scheduledAt: "2026-03-08 13:30" },
-  { id: "3", candidateName: "田中 美咲", candidateInitial: "田", questionSet: "PM総合評価", status: "in_progress", score: null, scheduledAt: "2026-03-07 16:00" },
-  { id: "4", candidateName: "高橋 健太", candidateInitial: "高", questionSet: "フロントエンド応用", status: "evaluated", score: 92, scheduledAt: "2026-03-05 11:00" },
-  { id: "5", candidateName: "渡辺 さくら", candidateInitial: "渡", questionSet: "バックエンド基礎", status: "evaluated", score: 78, scheduledAt: "2026-03-04 14:00" },
-];
 
 const tabs: { label: string; value: InterviewStatus | "all" }[] = [
   { label: "全て", value: "all" },
@@ -40,9 +32,31 @@ const statusBadge: Record<InterviewStatus, { label: string; className: string }>
 };
 
 export default function InterviewsPage() {
+  const { orgId } = useOrganization();
+  const [interviews, setInterviews] = useState<InterviewRow[]>([]);
+  const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState<InterviewStatus | "all">("all");
 
-  const filtered = interviews.filter((iv) => activeTab === "all" || iv.status === activeTab);
+  useEffect(() => {
+    if (!orgId) {
+      setLoading(false);
+      return;
+    }
+    const supabase = createClient();
+    supabase
+      .from("interviews")
+      .select("id, status, scheduled_at, created_at, candidate:candidates(name)")
+      .eq("organization_id", orgId)
+      .order("created_at", { ascending: false })
+      .then(({ data }) => {
+        setInterviews((data as InterviewRow[] | null) ?? []);
+        setLoading(false);
+      });
+  }, [orgId]);
+
+  const filtered = interviews.filter(
+    (iv) => activeTab === "all" || iv.status === activeTab
+  );
 
   return (
     <div className="space-y-6 max-w-6xl">
@@ -78,52 +92,64 @@ export default function InterviewsPage() {
 
       {/* Table */}
       <div className="rounded-lg border border-border bg-surface">
-        <table className="w-full text-sm">
-          <thead>
-            <tr className="border-b border-border-sub text-left text-xs text-text-muted">
-              <th className="px-5 py-3 font-medium">候補者</th>
-              <th className="px-5 py-3 font-medium">質問セット</th>
-              <th className="px-5 py-3 font-medium">ステータス</th>
-              <th className="px-5 py-3 font-medium">スコア</th>
-              <th className="px-5 py-3 font-medium">予定日時</th>
-              <th className="px-5 py-3 font-medium">操作</th>
-            </tr>
-          </thead>
-          <tbody>
-            {filtered.map((iv) => {
-              const badge = statusBadge[iv.status];
-              return (
-                <tr key={iv.id} className="border-b border-border-sub last:border-0 hover:bg-background transition-colors">
-                  <td className="px-5 py-3">
-                    <div className="flex items-center gap-2.5">
-                      <div className="flex h-7 w-7 items-center justify-center rounded-full bg-gradient-to-br from-accent to-purple-500 text-[10px] font-bold text-white">
-                        {iv.candidateInitial}
+        {loading ? (
+          <div className="px-5 py-8 text-center text-sm text-text-muted">面接データがありません</div>
+        ) : filtered.length === 0 ? (
+          <div className="px-5 py-8 text-center text-sm text-text-muted">
+            {interviews.length === 0
+              ? "面接がまだ作成されていません。「新規作成」から始めてください。"
+              : "該当する面接が見つかりません。"}
+          </div>
+        ) : (
+          <table className="w-full text-sm">
+            <thead>
+              <tr className="border-b border-border-sub text-left text-xs text-text-muted">
+                <th className="px-5 py-3 font-medium">候補者</th>
+                <th className="px-5 py-3 font-medium">ステータス</th>
+                <th className="px-5 py-3 font-medium">予定日時</th>
+                <th className="px-5 py-3 font-medium">操作</th>
+              </tr>
+            </thead>
+            <tbody>
+              {filtered.map((iv) => {
+                const badge = statusBadge[iv.status];
+                const candidateName =
+                  (iv.candidate as unknown as { name: string } | null)?.name ?? "不明";
+                return (
+                  <tr key={iv.id} className="border-b border-border-sub last:border-0 hover:bg-background transition-colors">
+                    <td className="px-5 py-3">
+                      <div className="flex items-center gap-2.5">
+                        <div className="flex h-7 w-7 items-center justify-center rounded-full bg-gradient-to-br from-accent to-purple-500 text-[10px] font-bold text-white">
+                          {candidateName[0]}
+                        </div>
+                        <span className="font-medium">{candidateName}</span>
                       </div>
-                      <span className="font-medium">{iv.candidateName}</span>
-                    </div>
-                  </td>
-                  <td className="px-5 py-3 text-text-sub">{iv.questionSet}</td>
-                  <td className="px-5 py-3">
-                    <span className={cn("rounded-full px-2.5 py-0.5 text-xs font-medium", badge.className)}>
-                      {badge.label}
-                    </span>
-                  </td>
-                  <td className="px-5 py-3">{iv.score !== null ? `${iv.score}点` : "-"}</td>
-                  <td className="px-5 py-3 text-text-muted">{iv.scheduledAt}</td>
-                  <td className="px-5 py-3">
-                    <Link
-                      href={`/dashboard/interviews/${iv.id}`}
-                      className="inline-flex items-center gap-1 rounded-md border border-border px-2.5 py-1 text-xs font-medium text-text-sub hover:bg-accent-light hover:text-accent hover:border-accent/30 transition-colors"
-                    >
-                      <Eye className="h-3 w-3" />
-                      詳細
-                    </Link>
-                  </td>
-                </tr>
-              );
-            })}
-          </tbody>
-        </table>
+                    </td>
+                    <td className="px-5 py-3">
+                      <span className={cn("rounded-full px-2.5 py-0.5 text-xs font-medium", badge.className)}>
+                        {badge.label}
+                      </span>
+                    </td>
+                    <td className="px-5 py-3 text-text-muted">
+                      {iv.scheduled_at
+                        ? new Date(iv.scheduled_at).toLocaleString("ja-JP", { month: "numeric", day: "numeric", hour: "2-digit", minute: "2-digit" })
+                        : "-"}
+                    </td>
+                    <td className="px-5 py-3">
+                      <Link
+                        href={`/dashboard/interviews/${iv.id}`}
+                        className="inline-flex items-center gap-1 rounded-md border border-border px-2.5 py-1 text-xs font-medium text-text-sub hover:bg-accent-light hover:text-accent hover:border-accent/30 transition-colors"
+                      >
+                        <Eye className="h-3 w-3" />
+                        詳細
+                      </Link>
+                    </td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        )}
       </div>
     </div>
   );
